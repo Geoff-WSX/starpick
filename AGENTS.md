@@ -14,7 +14,7 @@ GitHub 公开项目自动发现与下载引导工具：定时搜索 GitHub 高�
 # 一键启动（自动建 backend/.venv、装依赖、构建前端、开浏览器）
 ./start.sh                      # 服务地址 http://127.0.0.1:8000，停止用 pkill -f 'uvicorn app.main:app'
 
-# 后端测试（130+ 项，当前 132；必须用 venv 里的 python）
+# 后端测试（139 项，2026-10-18 实测全绿；必须用 venv 里的 python）
 cd backend && .venv/bin/python -m pytest tests -q
 cd backend && .venv/bin/python -m pytest tests/test_collector.py -q   # 单文件更快迭代
 
@@ -24,6 +24,17 @@ cd frontend && npm run build
 # 前端开发模式（热更新，API 代理到 127.0.0.1:8000）
 cd frontend && npm run dev      # http://localhost:5173
 ```
+
+## 改动约定
+
+- 最小局部修改，不做顺手重构；一次会话解决一个明确问题；预计要动超过 3 个文件时先给方案再动手。
+- 改前端后必须 `npm run build`；改后端后跑 `pytest`；连续 2 次测试失败即停下报告，不要继续叠加改动。
+
+## Git 与远端
+
+- 私有仓库 `https://github.com/Geoff-WSX/starpick-mac`（分支 `main`）。Windows 分支不在同一仓库（见 FORK.md），不要往这个仓库里塞 Windows 专有内容。
+- **直连 `github.com` 会被墙，但 `api.github.com` 可以直连**——现象是 `gh` 建库/查 API 一切正常、`git push` 却超时（或报 HTTP2 framing error）。本仓库 `.git/config` 已写死 `http.proxy=http://127.0.0.1:7890` 与 `http.version=HTTP/1.1`，推送/拉取前确认本机代理在运行；凭据走 `credential.helper='!gh auth git-credential'`（Token 从 gh 钥匙串取，不落盘，不要改成把 Token 写进 URL）。
+- 永不提交：`history.db*`、`backend/data/`（备份目录）、`logs/`、`*.log*`、`.runtime_token`、`frontend/dist/`、`node_modules/`、`.venv/`、`*.tsbuildinfo`、编译产物 `frontend/vite.config.js` 与其 `.d.ts`。推前自查：`git ls-files | grep -Ei '\.env$|runtime_token|\.db|node_modules|dist/|\.log'` 应无输出。
 
 ## 目录结构与分层规则
 
@@ -48,6 +59,12 @@ frontend/src/
 ├── api.ts               # 所有后端调用集中在此
 └── router.ts
 ```
+
+## 前端样式约定
+
+- 全部样式集中在 `frontend/src/style.css`（组件不写 scoped style）；颜色一律走主题变量（`--accent` / `--accent-deep` / `--accent-weak` / `--on-accent` 等），日/夜两套在 `[data-theme="light"]` 下覆盖，禁止硬编码色值。
+- 按钮统一 `.btn` 基底（含透明 1px 边框，保证同排按钮高度一致）+ 变体：`.dl` 实底主操作、`.ghost` 描边次级、`.prompt` 浅橙底次级（复制安装提示词专用）、`.small` 小号。
+- 弹窗统一 `.modal-overlay` + `.modal` 骨架（`DownloadPicker` 用 `.picker-mask/.picker` 类名，但遮罩/圆角/动画等视觉参数已与 modal 对齐——改一处要对照另一处）。
 
 ## 数据库迁移规则（重要）
 
@@ -83,6 +100,7 @@ frontend/src/
 - 定时任务用单 worker 线程池串行：唤醒后多个任务同时到期时，并行提交会让后来者撞上"已有采集任务运行中"被整轮跳过（当日全量扫荡直接丢失）。
 - 排查"定时轮次没跑"先看 `/health` 的 `next_collect_at`/`next_full_at`：停在过去时间说明调度线程尚未被唤醒（休眠场景），而不是任务失败。
 - `backend/history.db*`、`logs/`、`frontend/dist/`、`node_modules/` 均已 gitignore，不要提交或手改。
+- **详情页直开/刷新必定是深色**：`index.html` 硬编码 `data-theme="dark"`，而主题切换按钮所在的 `AppHeader` 只在 `ProjectList.vue` 挂载——直接打开/刷新详情页会丢失日间主题且页面上无处切换（2026-10-18 已定位、未修；最小修法是在 `main.ts` 挂载前读 `localStorage` 主题）。别把它当成新引入的 bug。
 - **详情接口响应会随语言数变大**：`/api/projects/{id}` 会带上全部语言正文（supabase 41 种语言约 600 KB 未压缩；列表接口走 `_LIST_COLS` 不返回这些大字段）。改详情接口时别顺手把语言字段塞进列表接口。
 - **浏览器自动化点长详情页会超时**：README 很长时 Playwright 的 `click()` 常超时（即使 `force: true`），改用 `locator.evaluate((el) => el.click())` 派发真实 DOM 点击触发 Vue 事件委托；页面里 `.markdown-body` 有多个（release 说明 + README），README 是最后一个。
 - **会话顶部注入的约束可能来自另一个项目**：`~/AGENTS.md` 写的是「街头美食社交平台」（React + Ant Design + Express + Prisma + MySQL），会被当作 workspace 约束注入到本仓库的会话里。那套规则（如「后端只允许改 backend/src/」）与本仓库布局不符，**一律以本文件为准**。
