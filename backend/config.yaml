@@ -1,0 +1,229 @@
+# STARPICK 拾星 · 配置文件
+# 修改后重启服务生效；启动时会强校验，非法配置会拒绝启动并定位错误。
+
+server:
+  host: 127.0.0.1          # 仅本机访问；如需局域网访问请配置鉴权后再改 0.0.0.0
+  port: 8000
+  static_dir: ../frontend/dist   # 前端构建产物（vite build 输出），不存在时仅提供 API
+
+schedule:
+  interval_hours: 6        # 轻量发现轮频率：只搜近期新建的高星仓库（1~2 次搜索请求，秒级完成）
+  discovery_created_hours: 72   # 发现轮回看窗口：只搜最近 N 小时内创建的新仓库（建议 ≥ 2×interval_hours 防漏）
+  full_sweep_hour: 4       # 每日全量关键词扫荡时刻（0-23，本地时区；重活一天一次即可）
+  timezone: Asia/Shanghai
+  misfire_grace_seconds: 3600   # 维护任务（数据库备份）错过调度后的容忍窗口；采集/更新任务唤醒后必补跑一次（不限迟到）
+  catchup_threshold_rounds: 2   # 距上次成功轮次超过 N 个周期时，启动即补跑
+  update_interval_hours: 24      # 更新检查频率（定时增量检查，与采集轮次分开调度）
+
+github:
+  token_env: GITHUB_TOKEN   # 从环境变量/.env 读取，绝不写入本文件
+  search_rate_per_minute: 10   # 未认证 10，认证 30；配置后自动按 token 有无生效
+  core_rate_per_hour: 60       # 未认证 60，认证 5000；同上
+  request_timeout: 15          # 连接/读取超时（秒）
+  retry_max: 3                 # 5xx/超时最大重试次数
+  mirror_enabled: true         # 国内网络不佳时启用镜像通道（README/下载直链）
+  mirror_prefixes:             # raw.githubusercontent.com 镜像前缀，按顺序 failover
+    - https://gh-proxy.com/
+    - https://ghproxy.net/
+  per_category_top: 100        # 每分类候选上限（全量采集的安全上限，可按需调小）
+  concurrency: 12              # README/release 二次抓取并发数（镜像/raw 通道不占 API 配额，可调高）
+  update_batch_size: 30        # 每轮增量检查的项目数（最久未检查优先，滚动轮询）
+
+filter:
+  min_stars: 200
+  max_inactive_days: 90
+  zh_weight: 1.2               # 中文友好排序加权
+  require_zh: false            # false=中文友好仅加权不筛选
+
+dedup:
+  re_recommend_on_major_update: true   # star 翻倍时允许再次推荐（major 版本判定为后台异步，暂不生效）
+  rounds_retention: 90                 # rounds 表保留最近 N 轮
+  skip_existing_days: 7                # 已采集且 README 完整的项目，N 天内跳过详情抓取（每轮只拉新项目，显著提速；0=每次都全量刷新）
+
+categories:
+  影视:
+    - 追剧
+    - 番剧
+    - 动漫
+    - anime
+    - 在线观看
+    - 流媒体
+    - 在线影视
+    - TVBox
+    - IPTV
+    - m3u
+    - 聚合搜索
+    - 弹幕播放器
+    - 影视资源
+    - streaming
+    - vod
+  视频工具:
+    - 视频下载
+    - 视频解析
+    - 下载器
+    - downloader
+    - yt-dlp
+    - you-get
+    - 字幕
+    - subtitle
+    - B站下载
+    - 抖音下载
+    - 媒体下载
+  游戏:
+    - 模拟器
+    - emulator
+    - 游戏Mod
+    - game mod
+    - 游戏汉化
+    - 开源游戏
+    - 像素游戏
+    - 网页游戏
+    - 独立游戏
+    - indie game
+    - retro
+    - 掌机
+    - 游戏存档
+  游戏开发:
+    - 游戏引擎
+    - game engine
+    - 游戏服务器
+    - game server
+    - 游戏框架
+    - game framework
+  开发:
+    - 开发者工具
+    - developer tools
+    - cli
+    - 命令行
+    - 自托管应用
+    - self-hosted
+    - 代码编辑器
+    - code editor
+    - 文本编辑器
+    - text editor
+    - hex editor
+    - markdown 编辑器
+    - IDE
+    - API 工具
+    - api client
+    - 低代码平台
+    - low-code
+    - 开发脚手架
+    - scaffold
+    - 开发框架
+    - 调试工具
+    - roadmap
+    - programming
+    - 开发资料
+    - 数据库
+  AI工具:
+    - AI 绘画
+    - AI 编程助手
+    - AI 聊天
+    - 语音识别
+    - 图像生成
+    - AI 视频生成
+    - stable diffusion
+    - 大模型
+    - 推理
+    - llm
+    - agent
+    - harness
+    - prompt
+    - rag
+    - chatbot
+    - 工作流自动化
+    - AI workflow
+    - 智能体
+    - AI 助手
+  效率工具:
+    - 笔记
+    - 剪贴板
+    - clipboard
+    - 密码管理
+    - password manager
+    - 桌面自动化
+    - 文件管理
+    - file manager
+    - 窗口管理
+    - 应用启动器
+    - 快捷键工具
+    - 时间管理
+    - 提醒
+    - todo
+    - 任务管理
+    - 效率
+    - productivity
+    - 搜索工具
+    - 邮件客户端
+  加速工具:
+    - 游戏加速
+    - 变速器
+    - game speed
+    - speed hack
+    - 加速器
+    - 网络加速
+    - 代理
+    - proxy
+    - 下载加速
+    - 镜像加速
+    - mirror
+    - 中转
+    - 测速
+    - speed test
+    - speedtest
+    - CDN
+    - 网速
+  设计:
+    - icon pack
+    - 字体设计
+    - font
+    - 壁纸引擎
+    - wallpaper
+    - 海报设计
+    - 矢量设计
+    - 图标
+    - logo
+    - UI 设计
+    - 平面设计
+    - 排版
+    - 配色
+    - 设计稿
+  创作:
+    - 图片编辑
+    - photo editor
+    - 图像处理
+    - image processing
+    - 视频剪辑
+    - video editor
+    - 3D 建模
+    - 3d modeling
+    - 像素画
+    - sprite editor
+    - 音频制作
+    - 音频编辑
+    - 视频处理
+    - 修图
+    - animation
+    - 动画
+  音乐:
+    - 音乐
+    - music
+    - 播客
+    - podcast
+    - 网易云
+    - 歌词
+    - 音效
+    - spotify
+  阅读:
+    - 电子书
+    - ebook reader
+    - RSS
+    - 漫画
+    - 新闻
+    - 阅读器
+    - 有声书
+    - audiobook
+    - pdf reader
+    - kindle
+    - 杂志
