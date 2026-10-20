@@ -38,6 +38,15 @@ START_TIMEOUT_SECONDS = 45
 _PORT_TRIES = 12
 
 
+def _window_title() -> str:
+    """窗口标题带版本号（APP_VERSION 延迟导入，保持模块导入轻量）。"""
+    try:
+        from .main import APP_VERSION
+        return f"{WINDOW_TITLE} v{APP_VERSION}"
+    except Exception:
+        return WINDOW_TITLE
+
+
 def _ensure_stdio() -> None:
     """py2app 双击启动（无控制台）时 sys.stdout/stderr 为 None，补 devnull 防日志写入报错。"""
     for name in ("stdout", "stderr"):
@@ -217,7 +226,7 @@ def _open_window(url: str) -> None:
         ]),
     ]
     localization = {
-        "cocoa.menu.about": f"关于 {WINDOW_TITLE}",
+        "cocoa.menu.about": f"关于 {_window_title()}",
         "cocoa.menu.services": "服务",
         "cocoa.menu.view": "显示",
         "cocoa.menu.edit": "编辑",
@@ -234,7 +243,7 @@ def _open_window(url: str) -> None:
     storage_dir = paths.data_dir() / "webview"
     storage_dir.mkdir(parents=True, exist_ok=True)
     webview.create_window(
-        WINDOW_TITLE, url, width=1280, height=860, min_size=(980, 640),
+        _window_title(), url, width=1280, height=860, min_size=(980, 640),
         text_select=True,   # 允许选中/复制 README 文字（默认 False）
         js_api=_JsApi(),    # 前端 openExternal() 走此桥（window.open 在窗口内静默失效）
     )

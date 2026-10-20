@@ -446,16 +446,36 @@ export function fetchReadmeVariant(
 }
 
 
-// ---- 设置：GitHub Token 热生效 ----
+// ---- 设置：GitHub Token 热生效 + 「关于」分组 ----
+export interface AppUpdateState {
+  /** none=尚未检查 / up_to_date=已是最新 / newer=发现新版本 / unknown=无法检查（网络或私有仓库） */
+  status: 'none' | 'up_to_date' | 'newer' | 'unknown'
+  latest_tag: string
+  published_at: string
+  checked_at: string
+}
+
 export interface SettingsState {
   has_token: boolean
   masked_token: string
   search_rate_per_minute: number
   core_rate_per_hour: number
+  version: string
+  repo_url: string
+  app_update: AppUpdateState
 }
 
 export function fetchSettings(): Promise<SettingsState> {
   return getJson('/api/settings')
+}
+
+/** 手动触发应用更新检查（后台执行立即返回；结果稍后由 fetchSettings 轮询读取） */
+export async function checkAppUpdate(): Promise<void> {
+  const resp = await fetch('/api/app/update-check', { method: 'POST' })
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => null)
+    throw new Error(body?.detail ?? `HTTP ${resp.status}`)
+  }
 }
 
 export async function saveToken(token: string): Promise<SettingsState> {

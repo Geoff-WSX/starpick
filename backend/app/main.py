@@ -39,7 +39,10 @@ from .config import (
 from .db import Database
 from .github_api import resolve_repo_path, variant_lang
 
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
+# 项目仓库地址（设置弹窗「关于」分组展示 + 更新检查）；仓库转公开后无需改代码，
+# 无 token 用户即可匿名查到 Releases
+GITHUB_REPO = "Geoff-WSX/starpick-mac"
 log = logging.getLogger("kazumi")
 
 # 休眠看门狗参数：每 30s 比对挂钟与单调钟，差值超过 120s 判定为系统休眠过
@@ -106,9 +109,92 @@ class AppState:
         self.db: Database | None = None
         self.collector: Collector | None = None
         self.scheduler: BackgroundScheduler | None = None
+        # 应用自更新检查（内存态缓存，不入库）：结果 + 正在检查标志。
+        # status: "none" 未查过 / "up_to_date" / "newer" / "unknown"（网络或解析失败）
+        self.app_update: dict[str, Any] = {"status": "none", "latest_tag": "",
+                                           "published_at": "", "checked_at": ""}
+        self.app_update_lock = threading.Lock()
+        self.app_update_checking = False
 
 
 state = AppState()
+
+
+# ---------------- 应用自更新检查 ----------------
+def _parse_tag_version(tag: str) -> tuple[int, ...] | None:
+    """把 "v1.2.3" 解析成数字元组用于比较；非语义化 tag 返回 None（不误判为可升级）。"""
+    t = tag.strip().lstrip("vV")
+    if not t or not all(part.isdigit() for part in t.split(".")):
+        return None
+    return tuple(int(part) for part in t.split("."))
+
+
+def _check_app_update() -> None:
+    """查本项目最新 Release 与 APP_VERSION 比较，结果写 state.app_update 缓存。
+
+    独立请求、不走 GithubClient：采集限流器在匿名模式下全量扫荡期间会排队数分钟，
+    手动「立即检查」不能被它卡住。token 仍取 effective_token——仓库私有期间本人
+    token 能查到 Release，转公开后无 token 匿名即可，代码零改动。任何失败归入
+    "unknown"，不影响服务运行。
+    """
+    if state.app_update_checking:
+        return
+    state.app_update_checking = True
+    try:
+        import requests
+
+        headers = {"Accept": "application/vnd.github+json",
+                   "User-Agent": "StarPick-App"}
+        if state.cfg is not None and state.cfg.has_token:
+            headers["Authorization"] = f"Bearer {state.cfg.effective_token}"
+        try:
+            resp = requests.get(
+                f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
+                headers=headers, timeout=8,
+            )
+            if resp.status_code == 404:
+                # 私有仓库 + 无 token：查不到 Release，视为"暂无法检查"而非错误
+                result = {"status": "unknown", "latest_tag": "",
+                          "published_at": "", "checked_at": _now_iso()}
+            else:
+                resp.raise_for_status()
+                data = resp.json()
+                tag = (data.get("tag_name") or "").strip()
+                latest = _parse_tag_version(tag)
+                current = _parse_tag_version(APP_VERSION)
+                if latest is None or current is None:
+                    status = "unknown"
+                else:
+                    status = "newer" if latest > current else "up_to_date"
+                result = {"status": status, "latest_tag": tag,
+                          "published_at": data.get("published_at") or "",
+                          "checked_at": _now_iso()}
+        except (requests.RequestException, ValueError):
+            result = {"status": "unknown", "latest_tag": "",
+                      "published_at": "", "checked_at": _now_iso()}
+        with state.app_update_lock:
+            state.app_update = result
+        if result["status"] == "newer":
+            log.info("发现新版本：%s（当前 %s）", result["latest_tag"], APP_VERSION)
+        else:
+            log.info("应用更新检查完成：%s", result["status"])
+    finally:
+        state.app_update_checking = False
+
+
+def _app_update_job() -> None:
+    """定时自动检查应用更新（每 6 小时，与采集任务共用单 worker 串行——纯一次 HTTP
+    请求，不会拖延采集）。"""
+    _check_app_update()
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _app_update_state_payload() -> dict[str, Any]:
+    with state.app_update_lock:
+        return dict(state.app_update)
 
 
 def _collect_job(payload: RunRequest | None = None, source: str = "scheduled",
@@ -313,6 +399,15 @@ async def lifespan(app: FastAPI):
         _updates_job,
         IntervalTrigger(hours=cfg.update_interval_hours),
         id="updates",
+        misfire_grace_time=None,
+        coalesce=True,
+        max_instances=1,
+    )
+    # 应用自更新检查：每 6 小时一次（发现新版仅提示，不自动下载安装）
+    scheduler.add_job(
+        _app_update_job,
+        IntervalTrigger(hours=6),
+        id="app-update-check",
         misfire_grace_time=None,
         coalesce=True,
         max_instances=1,
@@ -666,6 +761,10 @@ def get_settings() -> dict[str, Any]:
         "masked_token": _mask_token(cfg.effective_token) if cfg.has_token else "",
         "search_rate_per_minute": cfg.search_rate,
         "core_rate_per_hour": cfg.core_rate,
+        # 「关于」分组：应用版本 / 项目地址 / 自更新检查状态
+        "version": APP_VERSION,
+        "repo_url": f"https://github.com/{GITHUB_REPO}",
+        "app_update": _app_update_state_payload(),
     }
 
 
@@ -710,6 +809,18 @@ def clear_token() -> dict[str, Any]:
         "search_rate_per_minute": cfg.search_rate,
         "core_rate_per_hour": cfg.core_rate,
     }
+
+
+@app.post("/api/app/update-check", response_model=dict[str, Any])
+def trigger_app_update_check() -> dict[str, Any]:
+    """手动触发应用更新检查（设置弹窗「关于」的「立即检查」按钮）。
+
+    后台线程执行（端点立即返回，不阻塞——网络超时最长 8s，前端自行轮询
+    /api/settings 拿结果）；同一时刻只允许一个检查在跑（幂等，重复点无害）。
+    """
+    threading.Thread(target=_check_app_update, daemon=True,
+                     name="app-update-check").start()
+    return {"ok": True, "app_update": _app_update_state_payload()}
 
 
 @app.get("/api/collect/params", response_model=dict[str, Any])
