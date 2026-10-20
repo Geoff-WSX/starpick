@@ -1,18 +1,15 @@
 # Windows 安装包 CI 构建（STARPICK 拾星）
 #
-# 触发：push 到 packaging/、backend/、frontend/ 相关文件，或手动 workflow_dispatch。
+# 触发：push main 或 tag v*（paths 过滤不适用于 tag push，故分支与 tag 共用无 paths 的 push 触发；
+# 私有工具仓库全量跑可接受），或手动 workflow_dispatch。
 # 产物：StarPick-1.0.0-setup.exe + selftest-report.txt（Actions artifacts，保留 14 天）。
-# 正式发布：打 tag v* 时构建并直接上传到 GitHub Release（见 upload_release job）。
+# 正式发布：打 tag v* 时构建并直接上传到 GitHub Release（见 release job）。
 name: build-windows
 
 on:
   push:
     branches: ["main"]
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - "packaging/**"
-      - ".github/workflows/build-windows.yml"
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       version:
