@@ -109,6 +109,17 @@ frontend/src/
 
 本机（Mac）与 Windows 旧电脑的项目**独立演进、互不同步**。不要把 Windows 分支（v13）的功能描述当作本机现状，也不要主动"对齐"两边；合并只能由用户显式发起。
 
+## 桌面打包（packaging/，2026-10 落地）
+
+桌面壳 = pywebview 窗口 + 程序化 uvicorn（`backend/app/desktop.py`），窗口只是本地服务的浏览器；动打包前先读这节的契约：
+
+- **路径层是唯一入口**：所有数据/资源路径必须走 `backend/app/paths.py`（数据目录、日志、备份、config/token/.env、静态目录）。`is_frozen()` 区分双模式：开发模式的行为常量与旧版字节级一致；冻结模式数据在 macOS `~/Library/Application Support/StarPick`、Windows `%APPDATA%\StarPick`（可 `STARPICK_DATA_DIR` 覆盖）。不要再写 `Path(__file__)` 推路径（Windows 不兼容），也不要在 paths.py 之外 pack 资源探测。
+- **随包资源布局与探测标记**：PyInstaller spec（`packaging/starpick.spec`，双平台共用）把前端产物放 `frontend_dist/`、默认配置放 `config.yaml`；`paths.resource_dir()` 靠这两个标记探资源根（macOS 实测在 `Contents/Frameworks`，勿硬编码）。Windows 的 zoneinfo 依赖 tzdata 数据文件（已在 requirements.txt），漏打包会在采集启动时崩。
+- **自检机制（CI 冒烟与打包验收依赖）**：`--selftest` 无窗口起服务→探活→校验静态页→退出。`STARPICK_SELFTEST=1` 会关闭启动补跑采集（空库 + 真 token 的组合绝不能发真实网络请求）；`STARPICK_SELFTEST_REPORT=<path>` 把输出写文件（Windows `console=False` 的 exe 在 CI 里 stdout 是 NUL，不写文件什么都看不到）；`STARPICK_SELFTEST_WEBVIEW=1` 额外校验 GUI 栈可导入。改 desktop/main/config 三者之一要复跑 `test_desktop.py` + `test_paths.py`。
+- **回环请求绝不走系统代理**：本机探测（/health、自检 GET）必须用 `desktop._urlopen_local()`（`ProxyHandler({})`）——macOS urllib 会读系统代理设置（Clash/表哥云），127.0.0.1 请求被转给代理后桌面壳会误报"启动失败"。WKWebView 自身直连回环，不受影响。
+- **构建入口与产物**：macOS `./packaging/macos/build_macos.sh` → `packaging/dist/StarPick.app` + `StarPick-*-arm64.dmg`（本地构建，构建用 `packaging/.venv-build`，勿用 Anaconda base——PyInstaller 不支持）；Windows `packaging/windows/build_windows.ps1` + `installer.iss`（Inno Setup，Per-user 无 UAC）→ CI `.github/workflows/build-windows.yml`（windows-latest 自带 Inno Setup 6，产物 `StarPick-*-setup.exe` + `selftest-report.txt`；tag `v*` 触发自动传 Release）。本机 PyInstaller 无法交叉编译 Windows 包，Windows 产物只能 CI 出。
+- **版本号三处同步**：spec `VERSION`、`installer.iss` `MyAppVersion`、`app.main.APP_VERSION`；改一处要同步其余。
+
 ## 延伸阅读
 
 - `README.md` — 功能全貌、API 一览、故障排查表（注意：第 15/91 行关于多语言 README 的描述还是「中/英」时代的写法，现状看上面那节）

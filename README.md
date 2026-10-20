@@ -22,6 +22,24 @@
 - **深空星图暗色 UI（默认）**：深空蓝黑底 + 静态星点辉光 + 星白文字 + 橙红星色强调，卡片/表格/下拉/通知面板全主题变量化；**日/夜一键切换**（顶栏圆形按钮，localStorage 记忆，刷新保持），日间为纸面冷白杂志风；统一顶栏组件（五页共用，导航位置恒定不随激活态漂移）；全部页面统一视觉语言
 - **生产级健壮性**：限流令牌队列、分级重试（429/403 按重置等待、5xx 退避）、镜像 failover、防重入原子锁（检查+建轮次一体）、崩溃/重启自动清理遗留运行轮次（防采集永久卡死）、优雅停机、结构化日志、65 项单元/契约测试
 
+## 桌面版安装包（推荐普通用户）
+
+除开发模式外，本项目提供免装 Python/Node 的桌面应用（内嵌窗口，行为与浏览器模式一致）：
+
+| 平台 | 产物 | 获取方式 |
+|------|------|----------|
+| macOS (Apple Silicon, 11+) | `StarPick-1.0.0-arm64.dmg` | 本地构建：`./packaging/macos/build_macos.sh` |
+| Windows 10/11 (x64) | `StarPick-1.0.0-setup.exe` | CI 构建（push/tag 自动触发 `.github/workflows/build-windows.yml`，产物在 Actions Artifacts / Release） |
+
+- **安装位置 / 双击启动**：Windows 装到 `%LOCALAPPDATA%\Programs\StarPick`（默认 Per-user，无 UAC 弹窗）；macOS 把 .app 拖进 Applications。
+- **数据与日志**：macOS 在 `~/Library/Application Support/StarPick/`（配置 config.yaml、数据库 history.db、日志 logs/）；Windows 在 `%APPDATA%\StarPick\`。可用 `STARPICK_DATA_DIR` 环境变量另指。卸载不删数据（Windows 卸载器明确保留）。
+- **与开发/服务模式共存**：桌面窗口启动时若发现本机已有 STARPICK 服务（127.0.0.1:8000），直接把既有实例显示进窗口，不会起第二个服务；端口被其它程序占用则自动顺延（8000→8011）。
+- **GITHUB_TOKEN**：桌面版同样支持——首次进入界面在「设置」里填入（热生效，存数据目录 `.runtime_token`），或把 `.env` 放进数据目录。
+- **首次打开的安全提示**：两者均未签名公证。
+  - macOS：右键 → 打开（或 系统设置 → 隐私与安全性 → 仍要打开）；ad-hoc 签名，Gatekeeper 拦截属预期。
+  - Windows：SmartScreen 弹「Windows 已保护你的电脑」时点「更多信息 → 仍要运行」。
+- **技术细节**：PyInstaller onedir + pywebview（系统 WebView：macOS WKWebView / Windows WebView2，Win10/11 预装）。下载链接仍由系统浏览器接管；`--selftest` 提供无窗口自检（CI 冒烟/排障用，报告见 selftest-report.txt）。
+
 ## 快速开始（macOS）
 
 ```bash

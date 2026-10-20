@@ -30,14 +30,23 @@ pyinstaller packaging/starpick.spec --noconfirm --clean `
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller 失败" }
 
 Write-Host "==> [4/5] 冻结包自检（含 webview GUI 栈检查）"
+# StarPick.exe 是 console=False 的窗口程序：PowerShell 里 & 调用立刻返回不等它，
+# 必须用 Start-Process -Wait 拿真实退出码（否则自检没跑完就往下走，$LASTEXITCODE
+# 还是上一步 PyInstaller 的 0，报告文件也还没生成——CI 首跑就栽在这里）
 $env:STARPICK_SELFTEST_WEBVIEW = "1"
-$env:STARPICK_SELFTEST_REPORT  = "packaging/dist/windows/selftest-report.txt"
-& packaging/dist/windows/StarPick/StarPick.exe --selftest --port 8960
-$selftestRc = $LASTEXITCODE
-Remove-Item Env:STARPICK_SELFTEST_REPORT -ErrorAction SilentlyContinue
-Remove-Item Env:STARPICK_SELFTEST_WEBVIEW  -ErrorAction SilentlyContinue
+$env:STARPICK_SELFTEST_REPORT  = "$(Get-Location)/packaging/dist/windows/selftest-report.txt"
+Remove-Item packaging/dist/windows/selftest-report.txt -ErrorAction SilentlyContinue
+$proc = Start-Process -FilePath "packaging/dist/windows/StarPick/StarPick.exe" `
+    -ArgumentList "--selftest", "--port", "8960" -Wait -PassThru
+$selftestRc = $proc.ExitCode
+Remove-Item Env:STARPICK_SELFTEST_WEBVIEW -ErrorAction SilentlyContinue
+Remove-Item Env:STARPICK_SELFTEST_REPORT  -ErrorAction SilentlyContinue
 if ($selftestRc -ne 0) {
-    Get-Content packaging/dist/windows/selftest-report.txt
+    if (Test-Path packaging/dist/windows/selftest-report.txt) {
+        Get-Content packaging/dist/windows/selftest-report.txt
+    } else {
+        Write-Host "（报告文件未生成——exe 可能在启动早期崩溃，看上方 PyInstaller 日志）"
+    }
     throw "冻结包自检失败（rc=$selftestRc）"
 }
 Get-Content packaging/dist/windows/selftest-report.txt | Select-Object -Last 3
