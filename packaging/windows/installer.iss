@@ -1,4 +1,4 @@
-; STARPICK 拾星 Windows 安装包（Inno Setup 6；随安装附带的 Languages/ChineseSimplified.isl 即可用）
+; STARPICK 拾星 Windows 安装包（Inno Setup 6）
 ; 产物：packaging/dist/windows/StarPick-1.0.0-setup.exe
 ; 构建：packaging/windows/build_windows.ps1 或 CI（.github/workflows/build-windows.yml）
 ; 前置：packaging/dist/windows/StarPick/（PyInstaller onedir，见 spec 构建步骤）
@@ -33,7 +33,8 @@ VersionInfoCopyright=MIT License
 VersionInfoDescription=GitHub 公开项目自动发现与下载引导工具
 
 [Languages]
-Name: "chs"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+; 中文语言包不在 Inno Setup 默认安装里（官方 Unofficial 翻译），随仓库提供：
+Name: "chs"; MessagesFile: "lang\ChineseSimplified.isl"
 
 [Files]
 Source: "..\dist\windows\StarPick\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
