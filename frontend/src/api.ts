@@ -1,5 +1,24 @@
 // 后端 API 类型与封装（仅调用 JSON API，三层单向依赖）
 
+/**
+ * 打开外部链接（外链统一切换点）。
+ *
+ * 桌面窗口（pywebview）里 window.open('_blank') 静默失效——macOS 新 WebView
+ * 回调只转发 LinkActivated 导航，window.open 的导航不属于该类型，前端全部
+ * 外链（下载/GitHub 页）必须走桌面壳注入的 js_api 桥；浏览器模式没有
+ * window.pywebview，自动回退 window.open，行为不变。
+ */
+export function openExternal(url: string): void {
+  if (!url) return
+  const bridge = (window as { pywebview?: { api?: { open_external?: (u: string) => unknown } } })
+    .pywebview?.api
+  if (bridge?.open_external) {
+    bridge.open_external(url)
+    return
+  }
+  window.open(url, '_blank', 'noopener')
+}
+
 export interface Asset {
   name: string
   url: string

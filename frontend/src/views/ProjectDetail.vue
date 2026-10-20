@@ -13,6 +13,7 @@ import {
   formatDate,
   formatSize,
   formatStars,
+  openExternal,
   removeFavorite,
   type HealthSnapshot,
   type Project,
@@ -43,7 +44,7 @@ function mirrorUrl(url: string): string {
 }
 
 function external(url: string) {
-  if (url) window.open(url, '_blank', 'noopener')
+  if (url) openExternal(url)
 }
 
 /** 优先走镜像加速；无镜像前缀时退回原始链接 */
@@ -625,7 +626,7 @@ function back() {
         <div v-if="extraLoading" class="variant-hint">正在从镜像抓取「{{ extraLoading }}」版本…</div>
         <div v-else-if="extraError" class="variant-hint error">
           {{ extraError }}
-          <a v-if="extraFallbackUrl" :href="extraFallbackUrl" target="_blank" rel="noopener">在 GitHub 打开</a>
+          <a v-if="extraFallbackUrl" :href="extraFallbackUrl" target="_blank" rel="noopener" @click.prevent="openExternal(extraFallbackUrl)">在 GitHub 打开</a>
         </div>
         <div v-if="readmeHtml" class="markdown-body" v-html="readmeHtml" @click="onReadmeClick"></div>
         <div v-else-if="readmeLang === 'zh'" class="empty">该项目没有自带中文 README。</div>

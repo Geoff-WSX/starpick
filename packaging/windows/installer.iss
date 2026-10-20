@@ -2,6 +2,9 @@
 ; 产物：packaging/dist/windows/StarPick-1.0.0-setup.exe
 ; 构建：packaging/windows/build_windows.ps1 或 CI（.github/workflows/build-windows.yml）
 ; 前置：packaging/dist/windows/StarPick/（PyInstaller onedir，见 spec 构建步骤）
+; 注意：Inno 指令行的行内注释不被剥离（Value 取到行尾），所有注释必须独立成行；
+; 行内写 "Key=Value  ; 注释" 会把注释并进 Value（CI 实测 PrivilegesRequired 因此报
+; "Values invalid"，见 Comp.SetupCompiler.SeparateDirective 的实现）。
 
 #define MyAppName "STARPICK 拾星"
 #define MyAppExeName "StarPick.exe"
@@ -13,7 +16,8 @@ AppId={{8A7C2E51-3F0B-4C9A-9B7D-6E15A2F04D3B}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
-DefaultDirName={autopf}\StarPick        ; lowest 权限下自动映射到 %LOCALAPPDATA%\Programs\StarPick
+; lowest 权限下 {autopf} 自动映射到 %LOCALAPPDATA%\Programs\StarPick（Per-user 无 UAC）
+DefaultDirName={autopf}\StarPick
 DefaultGroupName=STARPICK 拾星
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
@@ -22,7 +26,7 @@ OutputDir=..\dist\windows
 Compression=lzma2/max
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64compatible
-PrivilegesRequired=lowest               ; Per-user 安装：无 UAC 弹窗，卸载只删自己的文件
+PrivilegesRequired=lowest
 WizardStyle=modern
 SetupIconFile=..\icon.ico
 VersionInfoCopyright=MIT License

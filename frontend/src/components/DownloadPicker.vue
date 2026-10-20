@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { detectOS, formatSize, type Project } from '../api'
+import { openExternal, detectOS, formatSize, type Project } from '../api'
 
 const props = defineProps<{ project: Project }>()
 const emit = defineEmits<{ close: [] }>()
@@ -41,7 +41,7 @@ function mirrorUrl(url: string): string {
 }
 
 function download(url: string) {
-  window.open(url, '_blank', 'noopener')
+  openExternal(url)
 }
 
 /** 优先走镜像加速；无镜像前缀时退回原始链接 */
@@ -50,7 +50,7 @@ function downloadBest(url: string) {
 }
 
 function openGithub() {
-  window.open(props.project.html_url, '_blank', 'noopener')
+  openExternal(props.project.html_url)
 }
 
 // 支持 Esc 关闭弹窗（可访问性）

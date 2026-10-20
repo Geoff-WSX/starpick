@@ -180,6 +180,22 @@ def _open_path(path: Path) -> None:
         pass
 
 
+class _JsApi:
+    """注入页面的原生桥（window.pywebview.api.*）。
+
+    前端外链必须走这里：pywebview 6.x 的 macOS 窗口里 window.open('_blank')
+    会静默失效（新 WebView 创建回调只转发 LinkActivated 导航，window.open
+    不属于该类型），用户点击下载毫无反应——见 frontend/src/api.ts openExternal()。
+    """
+
+    def open_external(self, url: str) -> None:
+        import webbrowser
+
+        if not url.startswith(("http://", "https://")):
+            return
+        webbrowser.open(url, 2, True)   # new=2 新标签；下载/分享等外链交给系统默认浏览器
+
+
 def _open_window(url: str) -> None:
     """打开内嵌窗口（阻塞直到窗口关闭）；private_mode=False 让主题等 localStorage 持久化。"""
     import webview
@@ -220,6 +236,7 @@ def _open_window(url: str) -> None:
     webview.create_window(
         WINDOW_TITLE, url, width=1280, height=860, min_size=(980, 640),
         text_select=True,   # 允许选中/复制 README 文字（默认 False）
+        js_api=_JsApi(),    # 前端 openExternal() 走此桥（window.open 在窗口内静默失效）
     )
     webview.start(menu=menu, localization=localization,
                   private_mode=False, storage_path=str(storage_dir))
