@@ -34,3 +34,9 @@ venv/
 .idea/
 .vscode/
 .DS_Store
+
+# 打包（packaging/）：构建中间产物与打包用 venv；图标 icon.icns/icon.ico 入库
+packaging/.venv-build/
+packaging/build/
+packaging/dist/
+packaging/icon-preview*.png

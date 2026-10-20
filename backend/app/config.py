@@ -15,9 +15,13 @@ from typing import Any
 
 import yaml
 
-BASE_DIR = Path(__file__).resolve().parent.parent  # backend/
-DEFAULT_CONFIG_PATH = BASE_DIR / "config.yaml"
-RUNTIME_TOKEN_FILE = BASE_DIR / ".runtime_token"   # 前端设置页写入（权限 600）
+from . import paths
+
+# 路径层（app/paths.py）：开发模式与历史行为完全一致（backend/ 下），打包后切到用户数据目录。
+# 以下是模块级常量（测试 monkeypatch 依赖这些名字），数值统一由 paths 解析。
+BASE_DIR = paths.backend_dir()          # backend/（开发）；打包后为只读资源根
+DEFAULT_CONFIG_PATH = paths.config_path()
+RUNTIME_TOKEN_FILE = paths.runtime_token_path()   # 前端设置页写入（权限 600）
 
 TOKEN_PATTERN = re.compile(r"(ghp_|github_pat_|gho_|ghu_)[A-Za-z0-9_]+")
 
@@ -84,7 +88,7 @@ def _resolve_env_ref(value: Any) -> Any:
 class Config:
     host: str = "127.0.0.1"
     port: int = 8000
-    static_dir: Path = BASE_DIR.parent / "frontend" / "dist"
+    static_dir: Path = paths.default_static_dir()
 
     interval_hours: int = 6
     discovery_created_hours: int = 72   # 发现轮回看窗口：只搜最近 N 小时内创建的新仓库
@@ -140,7 +144,12 @@ class Config:
 
 
 def load_config(path: Path | str | None = None) -> Config:
-    path = Path(path) if path else DEFAULT_CONFIG_PATH
+    if path is None:
+        # 打包模式首次运行：把随包默认 config.yaml 种到用户数据目录（开发模式为空操作）
+        paths.ensure_user_config()
+        path = paths.config_path()
+    else:
+        path = Path(path)
     if not path.exists():
         raise ConfigError(f"配置文件不存在: {path}")
     try:
@@ -150,7 +159,7 @@ def load_config(path: Path | str | None = None) -> Config:
     if not isinstance(raw, dict):
         raise ConfigError("config.yaml 根节点必须是映射")
 
-    _load_env_file(BASE_DIR / ".env")
+    _load_env_file(paths.env_file_path())
     cfg = Config()
     # 运行时 Token（前端设置页保存）优先：重启后仍保留
     if RUNTIME_TOKEN_FILE.exists():
@@ -168,6 +177,11 @@ def load_config(path: Path | str | None = None) -> Config:
     static = _get("server", "static_dir", str(cfg.static_dir))
     # 相对路径以 backend/ 为基准解析（../frontend/dist → 项目根/frontend/dist）
     cfg.static_dir = (BASE_DIR / static).resolve() if not Path(static).is_absolute() else Path(static).resolve()
+    if paths.is_frozen() and not cfg.static_dir.exists():
+        # 打包场景：随包 config.yaml 的相对路径指向源码布局，回退到包内前端产物
+        bundled = paths.default_static_dir()
+        if bundled.exists():
+            cfg.static_dir = bundled
 
     # schedule
     cfg.interval_hours = int(_get("schedule", "interval_hours", cfg.interval_hours))

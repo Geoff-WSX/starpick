@@ -4,3 +4,4 @@ uvicorn[standard]>=0.30,<1.0
 apscheduler>=3.10,<4.0
 requests>=2.31,<3.0
 pyyaml>=6.0,<7.0
+tzdata>=2024.1   # zoneinfo 时区数据（Windows 无系统时区库，冻结打包必需；macOS/Linux 下为无害兜底）

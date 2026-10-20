@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import logging
 import logging.handlers
+import os
 import sys
 import threading
 import time
@@ -25,6 +26,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from . import paths
 from .collector import Collector
 from .config import (
     Config,
@@ -58,9 +60,10 @@ def _is_sleep_gap(wall_delta: float, mono_delta: float) -> bool:
     """
     return wall_delta - mono_delta > SLEEP_GAP_THRESHOLD_SECONDS
 
-LOG_DIR = Path(__file__).resolve().parent.parent.parent / "logs"
+# 运行期路径（app/paths.py）：开发模式 = 项目根/logs；打包后 = 用户数据目录/logs
+LOG_DIR = paths.logs_dir()
 # 数据库自动备份目录（模块级常量：测试用 monkeypatch 重定向到临时目录，避免污染生产备份）
-BACKUP_DIR = Path(__file__).resolve().parent.parent / "data" / "backup"
+BACKUP_DIR = paths.backup_dir()
 
 
 # ---------------- 日志初始化（轮转 + 结构化单行 JSON） ----------------
@@ -189,6 +192,8 @@ def _should_full_catchup() -> bool:
 
 def _startup_catchup() -> None:
     """启动补跑（单线程顺序判定）：全量优先——它覆盖发现轮的全部价值。"""
+    if os.environ.get("STARPICK_SELFTEST") == "1":
+        return  # 冒烟自检：无论有无 token 都不发起真实采集（CI 环境无网络兜底）
     if _should_full_catchup():
         log.info("超过 24h 未跑全量扫荡，启动后台补跑（全量）")
         _collect_job(source="full-startup")
@@ -260,7 +265,7 @@ async def lifespan(app: FastAPI):
         log.error("配置校验失败，拒绝启动：%s", exc)
         raise SystemExit(f"配置校验失败，拒绝启动：{exc}") from exc
     state.cfg = cfg
-    state.db = Database(Path(__file__).resolve().parent.parent / "history.db")
+    state.db = Database(paths.default_db_path())
     # 启动自愈：进程重启意味着遗留 running 轮次必然已死，先解除防重入锁
     stale = state.db.clear_stale_running()
     if stale:

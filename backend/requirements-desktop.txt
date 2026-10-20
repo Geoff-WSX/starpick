@@ -1,0 +1,3 @@
+# 桌面壳依赖（桌面窗口模式需要；纯服务模式 / 浏览器访问不需要安装）
+# macOS 会自动带上 pyobjc 系列，Windows 需要 WebView2 Runtime（Win10/11 一般已预装）
+pywebview>=6.2,<7.0
