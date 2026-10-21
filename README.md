@@ -2,6 +2,8 @@
 
 一个**生产级**的 GitHub 公开项目自动发现与下载引导工具。每隔数小时自动搜索 GitHub 上高质量、近期活跃、中文友好的开源项目，按 7 大分类整理成可交互榜单，并标注平台支持、系统要求与下载直链，帮你发现值得使用的工具。
 
+> **只想用，不想看技术细节？** 直接去[下载安装包](https://github.com/Geoff-WSX/starpick-mac/releases/latest)（Windows / macOS 双平台，双击安装即可）。
+
 ## 这是谁用的？不会 GitHub 也能用
 
 GitHub 上有几十万个免费开源的好工具，但英语界面、命令行方式、真假难辨的质量，把大多数人挡在了门外。**STARPICK 拾星做的是"替你逛 GitHub"**：它自动替你找、替你筛、替你翻译和标注，你只像刷应用商店一样点开、下载、用。
@@ -36,12 +38,14 @@ GitHub 上有几十万个免费开源的好工具，但英语界面、命令行�
 
 ## 桌面版安装包（推荐普通用户）
 
-除开发模式外，本项目提供免装 Python/Node 的桌面应用（内嵌窗口，行为与浏览器模式一致）：
+**下载地址：[GitHub Releases 最新版](https://github.com/Geoff-WSX/starpick-mac/releases/latest)** —— 打开后在 Assets 里下载对应平台的文件：
 
-| 平台 | 产物 | 获取方式 |
-|------|------|----------|
-| macOS (Apple Silicon, 11+) | `StarPick-1.0.0-arm64.dmg` | 本地构建：`./packaging/macos/build_macos.sh` |
-| Windows 10/11 (x64) | `StarPick-1.0.0-setup.exe` | CI 构建（push/tag 自动触发 `.github/workflows/build-windows.yml`，产物在 Actions Artifacts / Release） |
+| 平台 | 下载文件 | 说明 |
+|------|----------|------|
+| Windows 10/11 (x64) | `StarPick-1.1.0-setup.exe` | 双击安装，Per-user 无需管理员 |
+| macOS (Apple Silicon, 11+) | `StarPick-1.1.0-arm64.dmg` | 拖入 Applications |
+
+除下载安装包外，也可自行构建（开发者）：macOS `./packaging/macos/build_macos.sh`，Windows 由 CI 自动构建（`.github/workflows/build-windows.yml`）。
 
 - **安装位置 / 双击启动**：Windows 装到 `%LOCALAPPDATA%\Programs\StarPick`（默认 Per-user，无 UAC 弹窗）；macOS 把 .app 拖进 Applications。
 - **数据与日志**：macOS 在 `~/Library/Application Support/StarPick/`（配置 config.yaml、数据库 history.db、日志 logs/）；Windows 在 `%APPDATA%\StarPick\`。可用 `STARPICK_DATA_DIR` 环境变量另指。卸载不删数据（Windows 卸载器明确保留）。
@@ -50,6 +54,7 @@ GitHub 上有几十万个免费开源的好工具，但英语界面、命令行�
 - **首次打开的安全提示**：两者均未签名公证。
   - macOS：右键 → 打开（或 系统设置 → 隐私与安全性 → 仍要打开）；ad-hoc 签名，Gatekeeper 拦截属预期。
   - Windows：SmartScreen 弹「Windows 已保护你的电脑」时点「更多信息 → 仍要运行」。
+- **升级检查**：设置 → 关于 → 「立即检查」，或有新版本时自动提示（每 6 小时检查一次）。
 - **技术细节**：PyInstaller onedir + pywebview（系统 WebView：macOS WKWebView / Windows WebView2，Win10/11 预装）。下载链接仍由系统浏览器接管；`--selftest` 提供无窗口自检（CI 冒烟/排障用，报告见 selftest-report.txt）。
 
 ## 快速开始（macOS）
