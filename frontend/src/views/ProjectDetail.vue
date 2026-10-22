@@ -490,10 +490,16 @@ function back() {
 
 <template>
   <div class="container">
-    <!-- 顶栏 -->
+    <!-- 顶栏：图形 logo + 项目名（用短名 name，owner 前缀只在加载失败时兜底） -->
     <header class="topbar">
       <button class="btn ghost back-btn" @click="back">← 返回列表</button>
-      <h1 class="detail-title">{{ detail?.full_name || '项目详情' }}</h1>
+      <h1 class="detail-title">
+        <svg class="detail-logo" viewBox="0 0 48 48" aria-hidden="true">
+          <path d="M7 31a17 17 0 0 0 34 0" fill="none" stroke="var(--text)" stroke-width="4.5" stroke-linecap="round" />
+          <path d="M24 7l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7-5.4-4.7 7.1-.6z" fill="var(--accent)" />
+        </svg>
+        <span class="detail-name">{{ detail?.name || detail?.full_name || '项目详情' }}</span>
+      </h1>
       <span v-if="detail" class="stars">★ {{ formatStars(detail.stars) }}</span>
     </header>
 
@@ -526,33 +532,38 @@ function back() {
           <span v-for="r in detail.system_requirements" :key="r" class="tag req" :title="r">{{ r }}</span>
         </div>
 
-        <!-- 收藏：分组自动按项目主分类归类，无需手动输入 -->
-        <div class="fav-row">
-          <button class="btn" :class="isFav ? 'fav-on' : 'ghost'" :disabled="favBusy" @click="toggleFav">
+        <!-- 动作区：主操作居左，辅助动作右对齐；收藏并入行首，不再独占一行 -->
+        <div class="detail-actions">
+          <button
+            class="btn"
+            :class="isFav ? 'fav-on' : 'ghost'"
+            :disabled="favBusy"
+            :title="isFav ? `已归入「${favoriteGroupLabel}」分组` : '收藏后自动按项目主分类归入同组'"
+            @click="toggleFav"
+          >
             {{ isFav ? '★ 已收藏' : '☆ 收藏' }}
           </button>
-          <span v-if="isFav" class="hint">已归入「{{ favoriteGroupLabel }}」</span>
-        </div>
-
-        <div class="detail-actions">
           <template v-if="detail.assets.length > 0">
             <div v-if="matchedAssets.length" class="dl-primary">
               <button class="btn dl" @click="downloadBest(matchedAssets[0].url)">
                 下载 {{ currentOS }} 版{{ mirrorUrl(matchedAssets[0].url) ? '（镜像加速）' : '' }}
               </button>
-              <span class="hint">{{ matchedAssets[0].name }}（{{ formatSize(matchedAssets[0].size) }}）</span>
               <button v-if="mirrorUrl(matchedAssets[0].url)" class="btn ghost small" :title="matchedAssets[0].url" @click="external(matchedAssets[0].url)">原地址</button>
             </div>
-            <div v-else class="hint">当前系统 {{ currentOS || '未知' }} 暂无匹配安装包，可从下方列表选择。</div>
-            <button class="btn prompt small" title="查看安装提示词全文，复制给豆包等能操作电脑的 AI 助手，让它帮你安装" @click="openInstallPrompt">复制安装提示词</button>
+            <button class="btn prompt" title="查看安装提示词全文，复制给豆包等能操作电脑的 AI 助手，让它帮你安装" @click="openInstallPrompt">复制安装提示词</button>
           </template>
-          <template v-else>
-            <button class="btn dl" @click="openInstallPrompt">复制安装提示词</button>
-            <button class="btn ghost" @click="external(detail.html_url)">查看 GitHub 发布页</button>
-            <span class="hint">没有现成安装包？复制后发给豆包等 AI 助手（选「本地电脑模式」），它会帮你下载、装好并运行</span>
-          </template>
-          <button class="btn ghost" title="需可访问 GitHub 的网络；打不开时可直接使用上方站内 README" @click="external(detail.html_url)">查看原文（GitHub）</button>
+          <button v-else class="btn dl" @click="openInstallPrompt">复制安装提示词</button>
+          <span class="actions-spacer"></span>
+          <button class="btn ghost" title="需可访问 GitHub 的网络；打不开时可直接使用下方站内 README" @click="external(detail.html_url)">
+            {{ detail.assets.length > 0 ? 'GitHub 发布页 ↗' : 'GitHub ↗' }}
+          </button>
         </div>
+        <!-- 安装提示词的说明独占一行，不再插在按钮之间 -->
+        <p class="actions-hint">
+          <template v-if="detail.assets.length === 0">没有现成安装包？</template>
+          复制安装提示词发给豆包等 AI 助手（选「本地电脑模式」），它会帮你下载、装好并运行
+        </p>
+        <p v-if="matchedAssets.length" class="actions-hint">{{ matchedAssets[0].name }}（{{ formatSize(matchedAssets[0].size) }}） · 点击下方列表文件名也可直接下载</p>
 
         <!-- 全部版本列表 -->
         <div v-if="detail.assets.length > 0" class="asset-list">

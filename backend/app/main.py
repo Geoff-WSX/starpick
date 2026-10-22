@@ -42,7 +42,7 @@ from .github_api import resolve_repo_path, variant_lang
 APP_VERSION = "1.1.0"
 # 项目仓库地址（设置弹窗「关于」分组展示 + 更新检查）；仓库转公开后无需改代码，
 # 无 token 用户即可匿名查到 Releases
-GITHUB_REPO = "Geoff-WSX/starpick-mac"
+GITHUB_REPO = "Geoff-WSX/starpick"
 log = logging.getLogger("kazumi")
 
 # 休眠看门狗参数：每 30s 比对挂钟与单调钟，差值超过 120s 判定为系统休眠过
@@ -331,6 +331,15 @@ def _mount_static() -> None:
         def spa_fallback(full_path: str):
             if full_path.startswith("api/"):
                 raise HTTPException(status_code=404, detail="Not Found")
+            # dist 根目录的实体文件（favicon.svg 等）直接返回，避免被 fallback 吞成 index.html
+            candidate = (dist / full_path).resolve()
+            if (
+                full_path
+                and not full_path.endswith("/")
+                and candidate.is_file()
+                and candidate.is_relative_to(dist.resolve())
+            ):
+                return FileResponse(candidate)
             # index.html 每次重新请求（前端构建产物带 hash，改版后避免浏览器缓存旧 JS）
             return FileResponse(
                 dist / "index.html",

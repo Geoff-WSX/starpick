@@ -2,7 +2,7 @@
 
 一个**生产级**的 GitHub 公开项目自动发现与下载引导工具。每隔数小时自动搜索 GitHub 上高质量、近期活跃、中文友好的开源项目，按 7 大分类整理成可交互榜单，并标注平台支持、系统要求与下载直链，帮你发现值得使用的工具。
 
-> **只想用，不想看技术细节？** 直接去[下载安装包](https://github.com/Geoff-WSX/starpick-mac/releases/latest)（Windows / macOS 双平台，双击安装即可）。
+> **只想用，不想看技术细节？** 直接去[下载安装包](https://github.com/Geoff-WSX/starpick/releases/latest)（Windows / macOS 双平台，双击安装即可）。
 
 ## 这是谁用的？不会 GitHub 也能用
 
@@ -38,7 +38,7 @@ GitHub 上有几十万个免费开源的好工具，但英语界面、命令行�
 
 ## 桌面版安装包（推荐普通用户）
 
-**下载地址：[GitHub Releases 最新版](https://github.com/Geoff-WSX/starpick-mac/releases/latest)** —— 打开后在 Assets 里下载对应平台的文件：
+**下载地址：[GitHub Releases 最新版](https://github.com/Geoff-WSX/starpick/releases/latest)** —— 打开后在 Assets 里下载对应平台的文件：
 
 | 平台 | 下载文件 | 说明 |
 |------|----------|------|

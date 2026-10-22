@@ -1386,9 +1386,25 @@ a:hover {
   font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.3px;
-  word-break: break-all;
   flex: 1;
   min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* 顶栏 logo + 项目名：与列表页 brand 同一视觉语言 */
+.detail-logo {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  margin-right: 8px;
+}
+.detail-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: normal;
 }
 
 .panel {
@@ -1416,8 +1432,22 @@ a:hover {
   display: flex;
   gap: 10px;
   align-items: center;
-  margin-top: 16px;
   flex-wrap: wrap;
+  margin-top: 16px;
+  padding: 10px 0;
+  border-top: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--border);
+}
+/* 弹性占位：把右侧的辅助动作（GitHub 链接）推到行尾 */
+.actions-spacer {
+  flex: 1 1 auto;
+}
+/* 按钮行下方的说明文字：独立成行，不再插在按钮之间 */
+.actions-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.6;
 }
 
 .hint {
@@ -1703,7 +1733,6 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
 }
 
 .asset-list {
@@ -1977,14 +2006,7 @@ a:hover {
 
 
 /* ================= 收藏 + 健康度 ================= */
-.fav-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 14px 0 4px;
-  flex-wrap: wrap;
-}
-.fav-row .btn.fav-on {
+.detail-actions .btn.fav-on {
   background: var(--accent);
   color: var(--on-accent);
   border-color: var(--accent);
