@@ -623,6 +623,120 @@ class Database:
             )
         self._conn.commit()
 
+    # ---------------- 分类清除（用户主动清理误采/不再需要的分类存量） ----------------
+    @staticmethod
+    def _category_tag_blob(categories: str | None) -> str:
+        """附加分类 JSON 数组 → `,A,B,` 标签串（分隔符统一为单逗号）。
+
+        json.dumps 默认分隔符带空格（`"开发", "影视"`）， separators 剥离时
+        空格残留会让 `%,影视,%` LIKE 匹配落空，所以除引号括号外还要剥空格。
+        """
+        return (
+            "," + (categories or "").replace(" ", "").replace('"', "").replace("[", "").replace("]", "") + ","
+        )
+
+    def _category_hit_rows(self, names: list[str]) -> list[sqlite3.Row]:
+        """按分类名找出命中项目（主分类或附加分类数组任一命中）。
+
+        附加分类是 JSON 字符串（如 ["AI工具","开发"]），LIKE %名% 只做粗筛，
+        精确命中在 Python 侧用标签串边界比对（`,名,`）——LIKE %名% 本身会
+        误伤前缀同名分类（"音乐" vs "音乐与阅读"）。
+        """
+        hits: dict[int, sqlite3.Row] = {}
+        for name in names:
+            rows = self._conn.execute(
+                "SELECT id, category, categories FROM projects WHERE category=?",
+                (name,),
+            ).fetchall()
+            for r in rows:
+                hits[r["id"]] = r
+            extra = self._conn.execute(
+                "SELECT id, category, categories FROM projects WHERE categories LIKE ?",
+                (f"%{name}%",),
+            ).fetchall()
+            for r in extra:
+                if f",{name.replace(' ', '')}," in self._category_tag_blob(r["categories"]):
+                    hits[r["id"]] = r
+        return list(hits.values())
+
+    def category_project_counts(self, names: list[str]) -> dict[str, int]:
+        """按分类名统计可删项目数（主分类或附加分类命中且未收藏）。"""
+        if not names:
+            return {}
+        with self._lock:
+            fav_ids = {r["project_id"] for r in self._conn.execute("SELECT project_id FROM favorites")}
+            counts: dict[str, int] = {}
+            for name in names:
+                counts[name] = sum(
+                    1
+                    for r in self._conn.execute(
+                        "SELECT id, category, categories FROM projects WHERE category=? OR categories LIKE ?",
+                        (name, f"%{name}%"),
+                    )
+                    if r["category"] == name
+                    or f",{name.replace(' ', '')}," in self._category_tag_blob(r["categories"])
+                    if r["id"] not in fav_ids
+                )
+            return counts
+
+    def delete_projects_by_categories(self, names: list[str]) -> dict:
+        """删除命中分类的项目（主分类或附加分类任一命中），事务执行全删或全不删。
+
+        - 收藏项目不连坐（只把命中分类从其附加字段中摘除）；
+        - 被删项目在 health_snapshots / daily_picks / notifications 的行级联清理（无外键）；
+        - 残留在其它项目附加字段里的命中分类引用一并摘除。
+        """
+        if not names:
+            return {"deleted": 0, "kept_favorites": 0}
+        with self._lock:
+            fav_ids = {r["project_id"] for r in self._conn.execute("SELECT project_id FROM favorites")}
+            hits = self._category_hit_rows(names)
+            ids = [r["id"] for r in hits]
+            delete_ids = [i for i in ids if i not in fav_ids]
+            kept = len(ids) - len(delete_ids)
+            if not delete_ids and kept == 0:
+                return {"deleted": 0, "kept_favorites": 0}
+            try:
+                self._conn.execute("BEGIN IMMEDIATE")
+                if delete_ids:
+                    dp = ",".join("?" * len(delete_ids))
+                    for table in ("health_snapshots", "daily_picks", "notifications"):
+                        self._conn.execute(f"DELETE FROM {table} WHERE project_id IN ({dp})", delete_ids)
+                    self._conn.execute(f"DELETE FROM projects WHERE id IN ({dp})", delete_ids)
+                self._cleanup_category_refs(names)
+                self._conn.execute("COMMIT")
+            except Exception:
+                self._conn.execute("ROLLBACK")
+                raise
+            return {"deleted": len(delete_ids), "kept_favorites": kept}
+
+    def _cleanup_category_refs(self, names: list[str]) -> None:
+        """从所有项目附加分类数组中摘除命中分类（收藏保留项目的残引用也清）。
+
+        主分类字段不动：它仍命中 names 里的分类（否则项目不会被 flag 出来），
+        清掉筛选器里会出现"项目有分类但分类下没项目"的空档。
+        """
+        name_set = set(names)
+        for name in names:
+            rows = self._conn.execute(
+                "SELECT id, categories FROM projects WHERE categories LIKE ?",
+                (f"%{name}%",),
+            ).fetchall()
+            for row in rows:
+                if f",{name.replace(' ', '')}," not in self._category_tag_blob(row["categories"]):
+                    continue  # 粗筛命中（同名前缀），但不是完整分类名，跳过
+                try:
+                    cats = json.loads(row["categories"])
+                except (TypeError, ValueError):
+                    continue
+                remaining = [c for c in cats if c not in name_set]
+                if remaining != cats:
+                    self._conn.execute(
+                        "UPDATE projects SET categories=? WHERE id=?",
+                        (json.dumps(remaining, ensure_ascii=False), row["id"]),
+                    )
+
+
     def upsert_project(self, p: dict) -> bool:
         """按 full_name 去重更新；返回 True=新入库，False=更新已有。"""
         with self._lock:

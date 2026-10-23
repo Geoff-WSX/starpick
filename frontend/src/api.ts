@@ -216,6 +216,38 @@ export function fetchCategories(): Promise<{ categories: string[] }> {
   return getJson('/api/categories')
 }
 
+// ---- 分类清除（删除选中分类的存量项目，收藏保留；采集运行中后端拒绝） ----
+export interface CategoryCleanupCounts {
+  counts: Record<string, number>
+  /** 采集任务运行中（后端将拒绝执行删除） */
+  running: boolean
+}
+
+export async function previewCategoryCleanup(names: string[]): Promise<CategoryCleanupCounts> {
+  return postJson('/api/categories/preview-cleanup', { names })
+}
+
+export async function cleanupCategories(names: string[]): Promise<{ deleted: number; kept_favorites: number }> {
+  return postJson('/api/categories/cleanup', { names })
+}
+
+async function postJson<T>(url: string, body: unknown): Promise<T> {
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!resp.ok) {
+    let detail = `${resp.status}`
+    try {
+      const err = await resp.json()
+      detail = err?.detail || detail
+    } catch { /* 非 JSON 错误体 */ }
+    throw new Error(detail)
+  }
+  return resp.json() as Promise<T>
+}
+
 // 展示辅助：star 数与 GitHub 展示一致（≥1000 用 k 缩写，不用「万」）
 export function formatStars(n: number): string {
   if (n < 1000) return String(n)

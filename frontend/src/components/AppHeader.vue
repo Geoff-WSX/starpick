@@ -10,6 +10,7 @@ import {
   type NotificationItem,
 } from '../api'
 import CollectModal from './CollectModal.vue'
+import CategoryCleanupModal from './CategoryCleanupModal.vue'
 import FavoritesModal from './FavoritesModal.vue'
 import RoundsModal from './RoundsModal.vue'
 import SettingsModal from './SettingsModal.vue'
@@ -19,20 +20,22 @@ import { useClickOutside } from '../composables/useClickOutside'
 const router = useRouter()
 const health = ref<HealthResponse | null>(null)
 
-// 右侧弹窗开关（收藏 / 采集中心 / 采集历史 / 更新历史）
+// 右侧弹窗开关（收藏 / 采集中心 / 采集历史 / 更新历史 / 清除分类）
 const favOpen = ref(false)
 const collectOpen = ref(false)
 const roundsOpen = ref(false)
 const updatesOpen = ref(false)
 const settingsOpen = ref(false)
+const cleanupOpen = ref(false)
 
 // 互斥打开：任一弹窗打开时关闭其余
-function openModal(kind: 'fav' | 'collect' | 'rounds' | 'updates' | 'settings') {
+function openModal(kind: 'fav' | 'collect' | 'rounds' | 'updates' | 'settings' | 'cleanup') {
   favOpen.value = kind === 'fav'
   collectOpen.value = kind === 'collect'
   roundsOpen.value = kind === 'rounds'
   updatesOpen.value = kind === 'updates'
   settingsOpen.value = kind === 'settings'
+  cleanupOpen.value = kind === 'cleanup'
   toolsMenuOpen.value = false
 }
 
@@ -182,6 +185,7 @@ onUnmounted(() => {
         <button class="tools-menu-item" @click="openModal('collect')">采集中心</button>
         <button class="tools-menu-item" @click="openModal('rounds')">采集历史</button>
         <button class="tools-menu-item" @click="openModal('updates')">更新历史</button>
+        <button class="tools-menu-item" @click="openModal('cleanup')">清除分类项目</button>
       </div>
     </div>
     <!-- 设置：GitHub Token 热生效配置 -->
@@ -249,6 +253,7 @@ onUnmounted(() => {
 
   <FavoritesModal :open="favOpen" @close="favOpen = false" />
   <CollectModal :open="collectOpen" @close="collectOpen = false" @open-settings="openModal('settings')" />
+  <CategoryCleanupModal :open="cleanupOpen" @close="cleanupOpen = false" />
   <RoundsModal :open="roundsOpen" @close="roundsOpen = false" />
   <UpdatesModal :open="updatesOpen" @close="updatesOpen = false" />
   <SettingsModal :open="settingsOpen" @close="settingsOpen = false" />

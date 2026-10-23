@@ -860,6 +860,52 @@ def _all_categories() -> list[str]:
     return names
 
 
+class CategoryCleanupCounts(BaseModel):
+    """删除前预览：各分类可删项目数（收藏除外）。"""
+    counts: dict[str, int] = Field(default_factory=dict)
+    running: bool = False
+
+
+class CategoryCleanupRequest(BaseModel):
+    names: list[str] = Field(min_length=1, max_length=50)
+
+
+class CategoryCleanupOut(BaseModel):
+    deleted: int
+    kept_favorites: int
+
+
+@app.post("/api/categories/preview-cleanup", response_model=CategoryCleanupCounts)
+def preview_category_cleanup(payload: CategoryCleanupRequest) -> CategoryCleanupCounts:
+    """统计选中分类的可删项目数（收藏除外），打开确认弹窗时调用。"""
+    if state.db is None:
+        raise HTTPException(status_code=503, detail="服务尚未就绪")
+    names = [n.strip() for n in payload.names if n.strip()]
+    counts = state.db.category_project_counts(names)
+    return {"counts": counts, "running": state.db.has_running_round()}
+
+
+@app.post("/api/categories/cleanup", response_model=CategoryCleanupOut)
+def cleanup_categories(payload: CategoryCleanupRequest) -> CategoryCleanupOut:
+    """删除选中分类的全部存量项目（收藏保留）。
+
+    采集运行中拒绝执行：删除与采集同库写入，SQLite WAL 虽可并行读写，
+    但用户已明确要求两者互斥；提示稍后重试。
+    """
+    if state.db is None:
+        raise HTTPException(status_code=503, detail="服务尚未就绪")
+    names = [n.strip() for n in payload.names if n.strip()]
+    if not names:
+        raise HTTPException(status_code=400, detail="未选择要清除的分类")
+    if state.db.has_running_round():
+        raise HTTPException(status_code=409, detail="采集任务运行中，请等本轮结束后再清除")
+    backup_dir = paths.backup_dir()
+    state.db.backup(backup_dir)  # 删除前自动快照，失败则中止
+    result = state.db.delete_projects_by_categories(names)
+    log.info("分类清除：%s → 删除 %d 个、保留收藏 %d 个", names, result["deleted"], result["kept_favorites"])
+    return CategoryCleanupOut(deleted=result["deleted"], kept_favorites=result["kept_favorites"])
+
+
 @app.get("/api/stats", response_model=dict[str, Any])
 def stats() -> dict[str, Any]:
     total = state.db.count_projects()
