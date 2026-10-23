@@ -159,3 +159,19 @@ def test_similarity_prefix_not_hit(cclient):
     assert resp.status_code == 200
     assert resp.json()["deleted"] == 0
     assert db.project_exists("org/misc-1") is not None
+
+
+def test_cleanup_does_not_write_backup_dir(cclient, tmp_path):
+    """清除流程不新增备份快照（无恢复入口，备份无法回滚；日常备份由启动/定时任务维护）。
+
+    夹具启动时 lifespan 的 _backup_db 会写一份快照到重定向后的 BACKUP_DIR，
+    所以断言的是「清除前后快照数不变」，而不是目录为空。
+    """
+    client, db = cclient
+    bdir = tmp_path / "backup"
+    before = sorted(p.name for p in bdir.glob("history-*.db"))
+    resp = client.post("/api/categories/cleanup", json={"names": ["游戏"]})
+    assert resp.status_code == 200
+    assert resp.json()["deleted"] == 1
+    after = sorted(p.name for p in bdir.glob("history-*.db"))
+    assert after == before

@@ -90,7 +90,7 @@ function close() {
       <div class="modal-head">
         <div class="modal-title">
           <h2>清除分类项目</h2>
-          <span class="hint">删除选中分类的已入库项目；收藏的项目会保留，删除前自动备份数据库</span>
+          <span class="hint">删除选中分类的已入库项目；收藏的项目会保留。删除不可恢复，请谨慎勾选</span>
         </div>
         <button class="modal-close" title="关闭" @click="close">
           <svg class="modal-close-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">

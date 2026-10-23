@@ -899,8 +899,7 @@ def cleanup_categories(payload: CategoryCleanupRequest) -> CategoryCleanupOut:
         raise HTTPException(status_code=400, detail="未选择要清除的分类")
     if state.db.has_running_round():
         raise HTTPException(status_code=409, detail="采集任务运行中，请等本轮结束后再清除")
-    backup_dir = paths.backup_dir()
-    state.db.backup(backup_dir)  # 删除前自动快照，失败则中止
+    # 不做删除前备份：目前没有恢复入口，备份无法回滚这次操作；日常备份仍由启动/每日定时任务维护
     result = state.db.delete_projects_by_categories(names)
     log.info("分类清除：%s → 删除 %d 个、保留收藏 %d 个", names, result["deleted"], result["kept_favorites"])
     return CategoryCleanupOut(deleted=result["deleted"], kept_favorites=result["kept_favorites"])

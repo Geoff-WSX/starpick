@@ -685,6 +685,10 @@ class Database:
         - 收藏项目不连坐（只把命中分类从其附加字段中摘除）；
         - 被删项目在 health_snapshots / daily_picks / notifications 的行级联清理（无外键）；
         - 残留在其它项目附加字段里的命中分类引用一并摘除。
+
+        不做删除前备份：目前没有恢复入口，备份无法回滚这次操作；
+        日常备份仍由启动/每日 3:05 定时任务与 cleanup 端点之外的 backup() 维护。
+        返回 {"deleted", "kept_favorites"}。
         """
         if not names:
             return {"deleted": 0, "kept_favorites": 0}
@@ -735,7 +739,6 @@ class Database:
                         "UPDATE projects SET categories=? WHERE id=?",
                         (json.dumps(remaining, ensure_ascii=False), row["id"]),
                     )
-
 
     def upsert_project(self, p: dict) -> bool:
         """按 full_name 去重更新；返回 True=新入库，False=更新已有。"""
