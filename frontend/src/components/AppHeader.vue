@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import {
   fetchHealth,
   fetchNotifications,
+  fetchStats,
   markNotificationsRead,
   type HealthResponse,
   type NotificationItem,
@@ -81,9 +82,21 @@ const notifLoading = ref(false)
 const notifLimit = ref(15)
 const notifLoadedAll = ref(false)
 
+// 项目总数基线：首次拉取只记值不广播（页面初始加载会拉一遍列表），之后变化才广播
+let lastTotal = -1
+
 async function loadMeta() {
   try {
     health.value = await fetchHealth()
+  } catch { /* 忽略 */ }
+  // 顺带盯项目总数：采集轮次落库后 total_projects 变化 → 广播给列表页静默刷新。
+  // （列表只在筛选条件变化时重载，不通知的话新项目要切一下分类才出现。）
+  try {
+    const stats = await fetchStats()
+    if (lastTotal >= 0 && stats.total_projects !== lastTotal) {
+      window.dispatchEvent(new CustomEvent('starpick:projects-changed'))
+    }
+    lastTotal = stats.total_projects
   } catch { /* 忽略 */ }
 }
 

@@ -141,6 +141,28 @@ function loadMore() {
   loadProjects(true)
 }
 
+// ---- 采集落库后静默刷新：AppHeader 轮询发现项目总数变化时广播此事件 ----
+// 无 loading 闪烁：仅当前在第一页且无筛选/搜索时重拉第一页（新项目按现排序插进列表），
+// 处于翻页深处/带筛选时不打扰（重拉会跳页、且筛选集合可能没命中新项目）。
+async function silentReload() {
+  if (loading.value || loadingMore.value) return
+  if (page.value !== 1 || category.value || keyword.value.trim() || onlyNew.value) return
+  try {
+    const data = await fetchProjects({
+      lang: lang.value || undefined,
+      page: 1,
+      page_size: pageSize,
+      sort: sort.value,
+    })
+    const unchangedIds = data.total === total.value
+      && data.items.length === projects.value.length
+      && data.items.every((p, i) => p.id === projects.value[i]?.id)
+    if (unchangedIds) return // 页面与库完全一致才不动 DOM
+    projects.value = data.items
+    total.value = data.total
+  } catch { /* 下次轮询再试 */ }
+}
+
 onMounted(() => {
   if (!('IntersectionObserver' in window)) return
   io = new IntersectionObserver(
@@ -160,9 +182,11 @@ onMounted(() => {
     },
     { flush: 'post' },
   )
+  window.addEventListener('starpick:projects-changed', silentReload)
 })
 onUnmounted(() => {
   io?.disconnect()
+  window.removeEventListener('starpick:projects-changed', silentReload)
 })
 
 // ---- 交互：只改状态并写 URL（加载由上面的 watch 统一触发，避免双重请求） ----
