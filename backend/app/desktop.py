@@ -33,7 +33,7 @@ from pathlib import Path
 
 from . import paths
 
-WINDOW_TITLE = "STARPICK 拾星"
+WINDOW_TITLE = "STARPICK"
 START_TIMEOUT_SECONDS = 45
 _PORT_TRIES = 12
 
@@ -390,7 +390,7 @@ def _check_webview_import() -> str | None:
 
 def main(argv: list[str] | None = None) -> int:
     _ensure_stdio()
-    parser = argparse.ArgumentParser(prog="starpick", description="STARPICK 拾星桌面壳")
+    parser = argparse.ArgumentParser(prog="starpick", description="STARPICK 桌面壳")
     parser.add_argument("--port", type=int, default=None,
                         help="监听端口（默认取 config.yaml 的 server.port）")
     parser.add_argument("--selftest", action="store_true",
@@ -413,7 +413,7 @@ def main(argv: list[str] | None = None) -> int:
         cfg = load_config()
     except ConfigError as exc:
         log.error("配置校验失败，拒绝启动：%s", exc)
-        _show_error_window("STARPICK 拾星 · 配置校验失败", str(exc))
+        _show_error_window("STARPICK · 配置校验失败", str(exc))
         return 1
 
     preferred = args.port or cfg.port
@@ -427,7 +427,7 @@ def main(argv: list[str] | None = None) -> int:
         if free is None:
             msg = f"端口 {preferred} 起 {_PORT_TRIES} 个端口均被占用，无法启动。"
             log.error(msg)
-            _show_error_window("STARPICK 拾星 · 无法启动", msg)
+            _show_error_window("STARPICK · 无法启动", msg)
             return 1
         if free != preferred:
             log.warning("端口 %d 被占用，改用 %d", preferred, free)
@@ -436,7 +436,7 @@ def main(argv: list[str] | None = None) -> int:
         if not _wait_healthy(thread, port):
             log.error("服务未在 %ds 内就绪，启动失败", START_TIMEOUT_SECONDS)
             _show_error_window(
-                "STARPICK 拾星 · 启动失败",
+                "STARPICK · 启动失败",
                 f"内嵌服务未在 {START_TIMEOUT_SECONDS}s 内就绪（端口 {port}）。",
             )
             server.should_exit = True

@@ -101,7 +101,7 @@ if sys.platform == "darwin":
         version=VERSION,
         info_plist={
             "CFBundleName": "StarPick",
-            "CFBundleDisplayName": "STARPICK 拾星",
+            "CFBundleDisplayName": "STARPICK",
             "CFBundleShortVersionString": VERSION,
             "CFBundleVersion": VERSION,
             "LSMinimumSystemVersion": "11.0",

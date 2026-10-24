@@ -20,7 +20,7 @@ const router = createRouter({
 
 // 浏览器标签页标题固定为品牌名（index.html 的 <title> 与此一致，无需按路由切换）
 router.afterEach(() => {
-  document.title = 'STARPICK 拾星'
+  document.title = 'STARPICK'
 })
 
 export default router

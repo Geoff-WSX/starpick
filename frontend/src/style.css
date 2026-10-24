@@ -1,5 +1,5 @@
 /* ============================================================
-   STARPICK 拾星 · 深空星图
+   STARPICK · 深空星图
    主视觉（默认暗色）：深空蓝黑 + 星点辉光 + 橙红星色强调
    日间模式（[data-theme="light"]）：纸面冷白杂志风
    原则：暗色下文字浅色保证对比；星点背景克制静态；不堆叠渐变
@@ -163,13 +163,6 @@ a:hover {
   letter-spacing: 0.6px;
   line-height: 1.2;
   white-space: nowrap;
-}
-.brand-zh {
-  margin-left: 6px;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  color: var(--text-dim);
 }
 .app-header .topnav {
   flex: 0 0 auto;
@@ -2582,10 +2575,6 @@ a:hover {
 @media (max-width: 640px) {
   .app-header .brand-text {
     font-size: 18px;
-  }
-  .app-header .brand-zh {
-    font-size: 12px;
-    margin-left: 4px;
   }
   .app-header .topnav {
     margin: 0 0 0 auto;

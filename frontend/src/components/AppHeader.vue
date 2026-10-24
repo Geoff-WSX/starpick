@@ -196,7 +196,7 @@ onUnmounted(() => {
         <path d="M7 31a17 17 0 0 0 34 0" fill="none" stroke="var(--text)" stroke-width="4.5" stroke-linecap="round" />
         <path d="M24 7l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7-5.4-4.7 7.1-.6z" fill="var(--accent)" />
       </svg>
-      <span class="brand-text">STARPICK<span class="brand-zh">拾星</span></span>
+      <span class="brand-text">STARPICK</span>
     </h1>
     <!-- 导航：仅一个首页，无额外入口 -->
     <div class="status">

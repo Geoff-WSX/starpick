@@ -1,4 +1,4 @@
-# STARPICK 拾星 Windows 构建脚本（CI 用；本地手动构建同样适用）
+# STARPICK Windows 构建脚本（CI 用；本地手动构建同样适用）
 # 前置：Python 3.10+ 已装并激活、Node 20+ 已装。用法：
 #   powershell -ExecutionPolicy Bypass -File packaging/windows/build_windows.ps1
 # 产物：packaging/dist/windows/（StarPick onedir + selftest-report.txt + setup.exe）

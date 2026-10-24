@@ -380,7 +380,7 @@ async def lifespan(app: FastAPI):
         state.db.close()
 
 
-app = FastAPI(title="STARPICK 拾星", version=APP_VERSION, lifespan=lifespan)
+app = FastAPI(title="STARPICK", version=APP_VERSION, lifespan=lifespan)
 # 详情接口可能下发几百 KB 的 README 与全部语言变体，gzip 后体积约降一个数量级
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 

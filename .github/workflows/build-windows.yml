@@ -1,4 +1,4 @@
-# Windows 安装包 CI 构建（STARPICK 拾星）
+# Windows 安装包 CI 构建（STARPICK）
 #
 # 触发：push main 或 tag v*（paths 过滤不适用于 tag push，故分支与 tag 共用无 paths 的 push 触发；
 # 私有工具仓库全量跑可接受），或手动 workflow_dispatch。

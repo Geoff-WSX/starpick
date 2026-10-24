@@ -1,4 +1,4 @@
-# AGENTS.md — STARPICK 拾星（QuanWangSouSuo）
+# AGENTS.md — STARPICK（QuanWangSouSuo）
 
 GitHub 公开项目手动发现与下载引导工具：用户在采集中心手动触发搜索 GitHub 高质量中文友好项目，按分类入库（SQLite），FastAPI 提供 JSON API 并托管 Vue3 前端构建产物。**采集与项目更新检查均为手动触发（2026-10-24 起），调度器只留数据库备份与应用自更新两个后台任务。**
 
@@ -148,7 +148,7 @@ frontend/src/
 - **自检机制（CI 冒烟与打包验收依赖）**：`--selftest` 无窗口起服务→探活→校验静态页→退出。`STARPICK_SELFTEST=1` 会关闭启动补跑采集（空库 + 真 token 的组合绝不能发真实网络请求）；`STARPICK_SELFTEST_REPORT=<path>` 把输出写文件（Windows `console=False` 的 exe 在 CI 里 stdout 是 NUL，不写文件什么都看不到）；`STARPICK_SELFTEST_WEBVIEW=1` 额外校验 GUI 栈可导入。改 desktop/main/config 三者之一要复跑 `test_desktop.py` + `test_paths.py`。
 - **回环请求绝不走系统代理**：本机探测（/health、自检 GET）必须用 `desktop._urlopen_local()`（`ProxyHandler({})`）——macOS urllib 会读系统代理设置（Clash/表哥云），127.0.0.1 请求被转给代理后桌面壳会误报"启动失败"。WKWebView 自身直连回环，不受影响。
 - **构建入口与产物**：macOS `./packaging/macos/build_macos.sh [版本号]` → `packaging/dist/StarPick.app` + `StarPick-<版本>-arm64.dmg`（本地构建，构建用 `packaging/.venv-build`，勿用 Anaconda base——PyInstaller 不支持）；Windows `packaging/windows/build_windows.ps1` + `installer.iss`（Inno Setup，Per-user 无 UAC）→ CI `.github/workflows/build-windows.yml`（windows-latest 自带 Inno Setup 6，产物 `StarPick-*-setup.exe` + `selftest-report.txt`；tag `v*` 触发自动传 Release；要拿 `selftest-report.txt`/setup.exe 复盘用 `gh run download <run-id>`）。本机 PyInstaller 无法交叉编译 Windows 包，Windows 产物只能 CI 出；**验证 CI 包别解 Inno**——`gh run view --log` 的 `Compressing:` 行就是完整文件清单，版本读 setup.exe 内 UTF-16 版本资源（本机 innoextract 装不上，别再折腾）。
-- **版本号三处同步**：spec `VERSION`、`installer.iss` `MyAppVersion`、`app.main.APP_VERSION`（+ git tag 共四处）；改一处要同步其余（2026-10-23 发过 v1.2.0，流程已完整走通）。桌面壳窗口标题由 `desktop.py _window_title()` 生成（`STARPICK 拾星 vX.Y.Z`）。
+- **版本号三处同步**：spec `VERSION`、`installer.iss` `MyAppVersion`、`app.main.APP_VERSION`（+ git tag 共四处）；改一处要同步其余（2026-10-23 发过 v1.2.0，流程已完整走通）。桌面壳窗口标题由 `desktop.py _window_title()` 生成（`STARPICK vX.Y.Z`）。
 - **macOS dmg 要手动补传 Release**：CI 只产 Windows setup.exe；macOS 包打完要 `gh release upload vX.Y.Z packaging/dist/StarPick-<版本>-arm64.dmg`（v1.0.0 起一直如此，v1.2.0 也补传过）。用户"从 GitHub 下载安装"的前提是线上资产齐全。
 - **卸载/升级保留数据**：Inno `[UninstallDelete]` 特意不删数据目录；v1.0.0→v1.1.0 实测可原地升级。
 

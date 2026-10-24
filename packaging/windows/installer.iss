@@ -1,4 +1,4 @@
-; STARPICK 拾星 Windows 安装包（Inno Setup 6）
+; STARPICK Windows 安装包（Inno Setup 6）
 ; 产物：packaging/dist/windows/StarPick-1.0.0-setup.exe
 ; 构建：packaging/windows/build_windows.ps1 或 CI（.github/workflows/build-windows.yml）
 ; 前置：packaging/dist/windows/StarPick/（PyInstaller onedir，见 spec 构建步骤）
@@ -6,7 +6,7 @@
 ; 行内写 "Key=Value  ; 注释" 会把注释并进 Value（CI 实测 PrivilegesRequired 因此报
 ; "Values invalid"，见 Comp.SetupCompiler.SeparateDirective 的实现）。
 
-#define MyAppName "STARPICK 拾星"
+#define MyAppName "STARPICK"
 #define MyAppExeName "StarPick.exe"
 #define MyAppVersion "1.0"
 
@@ -18,7 +18,7 @@ AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
 ; lowest 权限下 {autopf} 自动映射到 %LOCALAPPDATA%\Programs\StarPick（Per-user 无 UAC）
 DefaultDirName={autopf}\StarPick
-DefaultGroupName=STARPICK 拾星
+DefaultGroupName=STARPICK
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
 OutputBaseFilename=StarPick-{#MyAppVersion}-setup

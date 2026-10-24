@@ -1,9 +1,9 @@
 #!/bin/bash
-# STARPICK 拾星 · 一键启动（macOS 版）
+# STARPICK · 一键启动（macOS 版）
 cd "$(dirname "$0")"
 
 echo "============================================"
-echo "   STARPICK 拾星 - 一键启动 (macOS)"
+echo "   STARPICK - 一键启动 (macOS)"
 echo "============================================"
 echo
 

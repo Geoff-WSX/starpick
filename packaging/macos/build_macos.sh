@@ -46,7 +46,7 @@ echo "==> 5/5 打 dmg（含 Applications 拖拽安装快捷方式）"
 STAGE="$(mktemp -d /tmp/starpick-dmg-stage.XXXXXX)"
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
-hdiutil create -volname "STARPICK 拾星 $VERSION" -srcfolder "$STAGE" \
+hdiutil create -volname "STARPICK $VERSION" -srcfolder "$STAGE" \
   -ov -format UDZO "$DMG"
 
 echo
