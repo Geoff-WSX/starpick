@@ -1,6 +1,6 @@
 # AGENTS.md — STARPICK 拾星（QuanWangSouSuo）
 
-GitHub 公开项目自动发现与下载引导工具：定时搜索 GitHub 高质量中文友好项目，按分类入库（SQLite），FastAPI 提供 JSON API 并托管 Vue3 前端构建产物。
+GitHub 公开项目手动发现与下载引导工具：用户在采集中心手动触发搜索 GitHub 高质量中文友好项目，按分类入库（SQLite），FastAPI 提供 JSON API 并托管 Vue3 前端构建产物。**采集与项目更新检查均为手动触发（2026-10-24 起），调度器只留数据库备份与应用自更新两个后台任务。**
 
 ## 技术栈
 
@@ -122,9 +122,8 @@ frontend/src/
 - **端口 8000 已占用**：`start.sh` 检测到会直接打开浏览器而不重复启动；重启服务先 `pkill -f 'uvicorn app.main:app'`。
 - GitHub raw 直连常被重置：README/图片/下载链接走镜像 failover（gh-proxy.com → ghproxy.net → 直连/API 兜底），镜像前缀列表在 config.yaml `github.mirror_prefixes`，不要硬编码。
 - 采集有防重入原子锁 + 启动时自动清理遗留 running 轮次；调试采集卡死先看 `logs/kazumi.log`（单行 JSON 结构化日志，5MB×5 轮转）和 `backend/uvicorn.log`。
-- **笔记本休眠会让定时轮次消失**：macOS 休眠时 `time.monotonic()` 冻结，APScheduler 的等待线程据此计时，睡眠期间连维护性 DarkWake 也不检查任务；历史上 `misfire_grace_time=3600` 还会把迟到超 1h 的轮次静默丢弃。现由 `_run_sleep_watchdog`（挂钟/单调钟差值判休眠）+ 采集/更新任务 `misfire_grace_time=None`（唤醒后 coalesce 补跑一次）兜底，改动前先读 `backend/tests/test_scheduler.py`。
-- 定时任务用单 worker 线程池串行：唤醒后多个任务同时到期时，并行提交会让后来者撞上"已有采集任务运行中"被整轮跳过（当日全量扫荡直接丢失）。
-- 排查"定时轮次没跑"先看 `/health` 的 `next_collect_at`/`next_full_at`：停在过去时间说明调度线程尚未被唤醒（休眠场景），而不是任务失败。
+- **笔记本休眠会让后台任务延迟**（2026-10-24 起仅剩数据库备份/应用自更新两个定时任务，采集已全手动）：macOS 休眠时 `time.monotonic()` 冻结，APScheduler 的等待线程据此计时，睡眠期间连维护性 DarkWake 也不检查任务。`_run_sleep_watchdog`（挂钟/单调钟差值判休眠）+ 剩余任务 `misfire_grace_time=None`（唤醒后 coalesce 补跑一次）兜底，改动前先读 `backend/tests/test_scheduler.py`。
+- 历史上的定时采集轮次（discovery/full/full-startup 等 source）仍存在于 rounds 表与采集历史弹窗里，`RoundsModal` 的来源标签是给旧数据渲染的，不要删。
 - `backend/history.db*`、`logs/`、`frontend/dist/`、`node_modules/` 均已 gitignore，不要提交或手改。
 - **详情页直开/刷新必定是深色**：已修（2026-10-18 定位，2026-10-23 在 `main.ts` 挂载前读 `localStorage` 主题落地）。`index.html` 仍硬编码 `data-theme="dark"` 作为首帧兜底，属预期勿改。
 - **8000 端口的服务身份要先确认再操作**：`lsof -ti tcp:8000` + `ps` 看是 `uvicorn app.main:app`（开发服务，库 `backend/history.db`）还是 `/Applications/StarPick.app/Contents/MacOS/StarPick`（桌面壳，库 `~/Library/Application Support/StarPick/history.db`）。**桌面壳检测到 8000 被占会直接连占端口的服务开窗口**——验证安装包时如果开发服务还在跑，看到的"应用"其实是开发服务的页面；测试库里插数据前先确认服务用的是哪个库文件。

@@ -133,7 +133,6 @@ export interface HealthResponse {
   version: string
   db_ok: boolean
   last_round: Record<string, unknown> | null
-  next_collect_at: string | null
   /** 是否已配置 GitHub Token（决定采集速度与限流） */
   has_token?: boolean
 }
@@ -190,7 +189,6 @@ export interface CollectParams {
   min_stars: number
   max_inactive_days: number
   per_category_max: number
-  interval_hours: number
   categories: string[]
 }
 

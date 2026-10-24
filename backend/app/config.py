@@ -90,13 +90,9 @@ class Config:
     port: int = 8000
     static_dir: Path = paths.default_static_dir()
 
-    interval_hours: int = 6
     discovery_created_hours: int = 72   # 发现轮回看窗口：只搜最近 N 小时内创建的新仓库
-    full_sweep_hour: int = 4            # 每日全量关键词扫荡的时刻（0-23，配置时区）
     timezone: str = "Asia/Shanghai"
     misfire_grace_seconds: int = 3600
-    catchup_threshold_rounds: int = 2
-    update_interval_hours: int = 24   # 更新检查频率（定时增量，与采集轮次分开调度）
 
     token: str = ""
     runtime_token: str = ""   # 前端设置页保存的 Token（热生效，优先于环境变量）
@@ -183,14 +179,10 @@ def load_config(path: Path | str | None = None) -> Config:
         if bundled.exists():
             cfg.static_dir = bundled
 
-    # schedule
-    cfg.interval_hours = int(_get("schedule", "interval_hours", cfg.interval_hours))
+    # schedule（采集/项目更新已改为纯手动触发，仅保留发现轮窗口/时区/维护任务容忍窗口）
     cfg.discovery_created_hours = int(_get("schedule", "discovery_created_hours", cfg.discovery_created_hours))
-    cfg.full_sweep_hour = int(_get("schedule", "full_sweep_hour", cfg.full_sweep_hour))
     cfg.timezone = str(_get("schedule", "timezone", cfg.timezone))
     cfg.misfire_grace_seconds = int(_get("schedule", "misfire_grace_seconds", cfg.misfire_grace_seconds))
-    cfg.catchup_threshold_rounds = int(_get("schedule", "catchup_threshold_rounds", cfg.catchup_threshold_rounds))
-    cfg.update_interval_hours = int(_get("schedule", "update_interval_hours", cfg.update_interval_hours))
 
     # github
     gh = raw.get("github", {}) if isinstance(raw.get("github", {}), dict) else {}
@@ -246,14 +238,8 @@ def validate(cfg: Config) -> None:
             errors.append(f"categories.{name}: 关键词列表为空")
     if cfg.port < 1 or cfg.port > 65535:
         errors.append(f"server.port: {cfg.port} 超出合法端口范围 (1-65535)")
-    if cfg.interval_hours < 1:
-        errors.append("schedule.interval_hours: 必须 >= 1")
     if cfg.discovery_created_hours < 1 or cfg.discovery_created_hours > 720:
         errors.append("schedule.discovery_created_hours: 必须在 1-720 之间")
-    if cfg.full_sweep_hour < 0 or cfg.full_sweep_hour > 23:
-        errors.append("schedule.full_sweep_hour: 必须在 0-23 之间")
-    if cfg.update_interval_hours < 1:
-        errors.append("schedule.update_interval_hours: 必须 >= 1")
     if cfg.update_batch_size < 1:
         errors.append("github.update_batch_size: 必须 >= 1")
     if cfg.min_stars < 0:

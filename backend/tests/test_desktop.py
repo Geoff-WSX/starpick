@@ -49,8 +49,7 @@ def test_selftest_ok(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr("app.config.load_config", fake_load_config)
     # main.py 在导入时就绑定了 load_config，lifespan 用的是那个引用，必须一并替换
     monkeypatch.setattr(main_mod, "load_config", fake_load_config)
-    # 自检不跑启动补采（避免测试联网），其余链路（静态托管/API/DB）真实执行
-    monkeypatch.setattr(main_mod, "_startup_catchup", lambda: None)
+    # 采集已全手动（无定时/启动补跑），其余链路（静态托管/API/DB）真实执行
     data = tmp_path / "data"
     monkeypatch.setenv("STARPICK_DATA_DIR", str(data))
 

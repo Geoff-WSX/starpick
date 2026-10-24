@@ -409,7 +409,7 @@ onUnmounted(() => {
     <div v-if="loading" class="empty">加载中…</div>
     <div v-else-if="projects.length === 0" class="empty">
       <template v-if="onlyNew === 'new'">近 72 小时暂无新增项目。可前往「采集中心」触发一轮搜索。</template>
-      <template v-else>暂无项目。可前往「采集中心」触发一轮搜索，或稍候定时采集。</template>
+      <template v-else>暂无项目。可前往「采集中心」手动触发一轮搜索。</template>
     </div>
     <div v-else class="grid">
       <ProjectCard v-for="p in projects" :key="p.id" :project="p" />

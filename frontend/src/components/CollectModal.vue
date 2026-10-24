@@ -419,7 +419,7 @@ function fmtTimeShort(iso: string): string {
             >{{ c }}</button>
           </div>
         </div>
-        <span class="collect-hint">对已采集项目逐个检查 GitHub 最新 release，标记有新版的条目（详情页可对比版本）；定时自动增量检查，历史与采集轮次分开保存</span>
+        <span class="collect-hint">对已采集项目逐个检查 GitHub 最新 release，标记有新版的条目（详情页可对比版本）；在此手动触发增量检查，历史与采集轮次分开保存</span>
       </div>
 
       <!-- 更新检查进度面板：进行中显示进度；结束后保留本次结果摘要 -->

@@ -7,7 +7,6 @@ from __future__ import annotations
 import json
 import logging
 import logging.handlers
-import os
 import sys
 import threading
 import time
@@ -223,71 +222,6 @@ def _collect_job(payload: RunRequest | None = None, source: str = "scheduled",
     log.info("采集任务结束: %s", summary.get("status"))
 
 
-def _updates_job() -> None:
-    """定时增量更新检查：每 update_interval_hours 检查最久未检查的 update_batch_size 条。"""
-    if state.collector is None or state.cfg is None:
-        return
-    log.info("定时增量更新检查开始（每 %sh 轮询最久未检查的 %d 条）",
-             state.cfg.update_interval_hours, state.cfg.update_batch_size)
-    summary = state.collector.check_updates(limit=state.cfg.update_batch_size)
-    log.info("更新检查结束: %s", summary.get("status"))
-
-
-def _should_catchup() -> bool:
-    if state.db is None or state.cfg is None:
-        return False
-    # 未配置 GITHUB_TOKEN 时不自动补跑：匿名限流（10 次/分钟）下全量补跑需排队十几分钟，
-    # 容易造成"重启后莫名跑了一轮全量"的困惑，且挤占用户手动触发时的配额。
-    if not state.cfg.has_token:
-        log.info("未配置 GITHUB_TOKEN：跳过启动自动补跑（可在设置中配置后重启生效）")
-        return False
-    last = state.db.last_round()
-    if last is None:
-        return True
-    if last["status"] == "running":
-        return False
-    try:
-        started = datetime.strptime(
-            last["started_at"], "%Y-%m-%d %H:%M:%S"
-        ).replace(tzinfo=timezone.utc)
-    except ValueError:
-        return True
-    threshold = timedelta(hours=state.cfg.interval_hours) * state.cfg.catchup_threshold_rounds
-    return (datetime.now(timezone.utc) - started) > threshold
-
-
-def _should_full_catchup() -> bool:
-    """最近一次全量/手动轮次超过 25h（每日扫荡周期 + 1h 容差）→ 启动补跑全量。"""
-    if state.db is None or state.cfg is None:
-        return False
-    if not state.cfg.has_token:
-        return False   # 与发现轮补跑同策略：匿名不自动补跑
-    last = state.db.last_round_by_sources(("manual", "full", "full-startup"))
-    if last is None:
-        return True
-    if last["status"] == "running":
-        return False
-    try:
-        started = datetime.strptime(
-            last["started_at"], "%Y-%m-%d %H:%M:%S"
-        ).replace(tzinfo=timezone.utc)
-    except ValueError:
-        return True
-    return (datetime.now(timezone.utc) - started) > timedelta(hours=25)
-
-
-def _startup_catchup() -> None:
-    """启动补跑（单线程顺序判定）：全量优先——它覆盖发现轮的全部价值。"""
-    if os.environ.get("STARPICK_SELFTEST") == "1":
-        return  # 冒烟自检：无论有无 token 都不发起真实采集（CI 环境无网络兜底）
-    if _should_full_catchup():
-        log.info("超过 24h 未跑全量扫荡，启动后台补跑（全量）")
-        _collect_job(source="full-startup")
-    elif _should_catchup():
-        log.info("检测到距上次轮次过久，启动后台补跑（发现轮）")
-        _collect_job(source="discovery-startup", discovery_only=True)
-
-
 def _run_sleep_watchdog(scheduler: BackgroundScheduler, stop_event: threading.Event,
                         clock=None,
                         interval_seconds: int = SLEEP_WATCHDOG_INTERVAL_SECONDS,
@@ -371,46 +305,11 @@ async def lifespan(app: FastAPI):
     state.collector = Collector(cfg, state.db)
     _mount_static()
 
-    # 单 worker 串行执行：唤醒后可能多个任务同时到期（发现轮 + 全量扫荡 + 更新检查），
-    # 并行提交会让晚到的一方撞上"已有采集任务运行中"被整轮跳过（当日全量扫荡就此丢失）；
-    # 串行排队则逐个跑完，互不影响
+    # 采集与项目更新检查只由用户手动触发（采集中心 / 更新历史弹窗），不再注册定时任务；
+    # 调度器仅维护两个后台任务：应用自更新检查 + 数据库每日备份（均与项目采集无关）
     scheduler = BackgroundScheduler(
         timezone=cfg.timezone,
         executors={"default": {"type": "threadpool", "max_workers": 1}},
-    )
-    # 采集/更新任务的 misfire_grace_time=None（不限迟到）+ coalesce：笔记本休眠期间错过的
-    # 轮次在唤醒后合并补跑一次；若沿用秒级容忍窗口，休眠错过 1h 以上的轮次会被静默丢弃，
-    # 这正是"定时轮次从来不见踪影"的原因（休眠看门狗负责唤醒调度器，见 _run_sleep_watchdog）
-    # 轻量发现轮：每 interval_hours 一次，只搜近期创建的高星新仓库（1~2 次搜索请求，秒级）。
-    # 用 IntervalTrigger：语义即"每 N 小时一轮"，任意 N 都成立；
-    # CronTrigger(hour="*/N") 在 N 不整除 24 时产生不匀间隔（如 7 → 7,7,7,3 小时）
-    scheduler.add_job(
-        _collect_job,
-        IntervalTrigger(hours=cfg.interval_hours),
-        id="collect",
-        kwargs={"source": "discovery", "discovery_only": True},
-        misfire_grace_time=None,
-        coalesce=True,
-        max_instances=1,
-    )
-    # 全量关键词扫荡：每天一次（召回存量关键词 + touch_seen 刷新 star/活跃时间）。
-    # 重活降频是采集提速的主体：日常轮次从 ~35 次搜索降到 1~2 次
-    scheduler.add_job(
-        _collect_job,
-        CronTrigger(hour=cfg.full_sweep_hour, minute=0, timezone=cfg.timezone),
-        id="full-sweep",
-        kwargs={"source": "full"},
-        misfire_grace_time=None,
-        coalesce=True,
-        max_instances=1,
-    )
-    scheduler.add_job(
-        _updates_job,
-        IntervalTrigger(hours=cfg.update_interval_hours),
-        id="updates",
-        misfire_grace_time=None,
-        coalesce=True,
-        max_instances=1,
     )
     # 应用自更新检查：每 6 小时一次（发现新版仅提示，不自动下载安装）
     scheduler.add_job(
@@ -448,16 +347,12 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         log.error("注册定时备份任务失败: %s", exc)
     _backup_db()
-    log.info("服务启动完成，定时采集每 %sh 一轮（每天 %d:00 全量扫荡）；更新检查每 %sh 增量一轮",
-             cfg.interval_hours, cfg.full_sweep_hour, cfg.update_interval_hours)
+    log.info("服务启动完成（采集与项目更新检查均为手动触发；数据库每日 3:05 自动备份、应用更新每 6h 自动检查）")
 
-    # 休眠看门狗：系统休眠唤醒后主动唤醒调度器，否则 schedule 里错过的轮次不会补跑
+    # 休眠看门狗：系统休眠唤醒后主动唤醒调度器（备份/自更新任务错过的时间窗口恢复用）
     watchdog_stop = threading.Event()
     threading.Thread(target=_run_sleep_watchdog, args=(scheduler, watchdog_stop),
                      daemon=True, name="sleep-watchdog").start()
-
-    threading.Thread(target=_startup_catchup, daemon=True,
-                     name="startup-catchup").start()
 
     # 存量项目全库回填（后台异步；README 快、release 受限流排队，均不阻塞启动与采集）
     if state.collector is not None:
@@ -579,8 +474,6 @@ class HealthOut(BaseModel):
     version: str
     db_ok: bool
     last_round: dict[str, Any] | None
-    next_collect_at: str | None
-    next_full_at: str | None = None   # 下次每日全量扫荡时间（发现轮之外的重轮次）
     has_token: bool = False   # 是否已配置 GitHub Token（决定采集速度与限流）
 
 
@@ -600,22 +493,11 @@ def health() -> HealthOut:
         last = dict(last)
         last["started_at"] = _iso_utc(last.get("started_at") or "") or ""
         last["finished_at"] = _iso_utc(last.get("finished_at") or "") or ""
-    next_at: str | None = None
-    next_full: str | None = None
-    if state.scheduler:
-        job = state.scheduler.get_job("collect")
-        if job and job.next_run_time:
-            next_at = job.next_run_time.isoformat()
-        full_job = state.scheduler.get_job("full-sweep")
-        if full_job and full_job.next_run_time:
-            next_full = full_job.next_run_time.isoformat()
     return HealthOut(
         status="ok" if db_ok else "degraded",
         version=APP_VERSION,
         db_ok=db_ok,
         last_round=last,
-        next_collect_at=next_at,
-        next_full_at=next_full,
         has_token=bool(state.cfg.has_token if state.cfg else False),
     )
 
@@ -841,7 +723,6 @@ def collect_params() -> dict[str, Any]:
         "min_stars": state.cfg.min_stars,
         "max_inactive_days": state.cfg.max_inactive_days,
         "per_category_max": state.cfg.per_category_top,
-        "interval_hours": state.cfg.interval_hours,
         "categories": _all_categories(),
     }
 

@@ -292,7 +292,7 @@ def _run_selftest(preferred_port: int) -> int:
     if not os.environ.get("STARPICK_DATA_DIR"):
         # 自检绝不碰真实用户数据：未显式指定时用一次性临时目录
         os.environ["STARPICK_DATA_DIR"] = tempfile.mkdtemp(prefix="starpick-selftest-")
-    os.environ.setdefault("STARPICK_SELFTEST", "1")  # 关闭启动补跑的采集（见 main._startup_catchup）
+    os.environ.setdefault("STARPICK_SELFTEST", "1")  # 冒烟标记（采集本就全手动，无定时/补跑可关）
 
     with _tee():
         return _run_selftest_inner(preferred_port)

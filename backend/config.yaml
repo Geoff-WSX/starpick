@@ -7,13 +7,10 @@ server:
   static_dir: ../frontend/dist   # 前端构建产物（vite build 输出），不存在时仅提供 API
 
 schedule:
-  interval_hours: 6        # 轻量发现轮频率：只搜近期新建的高星仓库（1~2 次搜索请求，秒级完成）
-  discovery_created_hours: 72   # 发现轮回看窗口：只搜最近 N 小时内创建的新仓库（建议 ≥ 2×interval_hours 防漏）
-  full_sweep_hour: 4       # 每日全量关键词扫荡时刻（0-23，本地时区；重活一天一次即可）
+  # 采集与项目更新检查均为手动触发（采集中心 / 更新历史），无定时任务
+  discovery_created_hours: 72   # 手动发现轮回看窗口：只搜最近 N 小时内创建的新仓库
   timezone: Asia/Shanghai
-  misfire_grace_seconds: 3600   # 维护任务（数据库备份）错过调度后的容忍窗口；采集/更新任务唤醒后必补跑一次（不限迟到）
-  catchup_threshold_rounds: 2   # 距上次成功轮次超过 N 个周期时，启动即补跑
-  update_interval_hours: 24      # 更新检查频率（定时增量检查，与采集轮次分开调度）
+  misfire_grace_seconds: 3600   # 维护任务（数据库备份）错过调度后的容忍窗口
 
 github:
   token_env: GITHUB_TOKEN   # 从环境变量/.env 读取，绝不写入本文件

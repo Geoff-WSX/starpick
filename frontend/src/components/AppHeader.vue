@@ -203,9 +203,6 @@ onUnmounted(() => {
       <span class="dot" :class="health?.status === 'ok' ? 'ok' : health ? 'err' : ''"></span>
       <span>
         后端 {{ health?.status === 'ok' ? '在线' : health ? '异常' : '连接中…' }}
-        <template v-if="health?.next_collect_at">
-          · 下次采集 {{ new Date(health.next_collect_at).toLocaleString('zh-CN') }}
-        </template>
         <template v-if="probePending > 0">
           · 安装包检测 {{ probeTotal - probePending }}/{{ probeTotal }}<template v-if="health && health.has_token === false">（未配 Token，速度受限）</template>
         </template>
