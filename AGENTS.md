@@ -14,7 +14,7 @@ GitHub 公开项目自动发现与下载引导工具：定时搜索 GitHub 高�
 # 一键启动（自动建 backend/.venv、装依赖、构建前端、开浏览器）
 ./start.sh                      # 服务地址 http://127.0.0.1:8000，停止用 pkill -f 'uvicorn app.main:app'
 
-# 后端测试（167 项，2026-10-20 实测全绿；必须用 venv 里的 python）
+# 后端测试（175 项，2026-10-23 实测全绿；必须用 venv 里的 python）
 cd backend && .venv/bin/python -m pytest tests -q
 cd backend && .venv/bin/python -m pytest tests/test_collector.py -q   # 单文件更快迭代
 
@@ -32,7 +32,7 @@ cd frontend && npm run dev      # http://localhost:5173
 
 ## Git 与远端
 
-- 仓库 `https://github.com/Geoff-WSX/starpick`（分支 `main`，**2026-10-20 起已公开**；v1.0.0/v1.1.0 Release 均已发布）。Windows 分支不在同一仓库（见 FORK.md），不要往这个仓库里塞 Windows 专有内容。
+- 仓库 `https://github.com/Geoff-WSX/starpick`（分支 `main`，已公开；2026-10-23 已发布 v1.2.0，tag 触发 Windows CI 自动产 setup.exe 上 Release，macOS dmg 手动补传）。Windows 分支不在同一仓库（见 FORK.md），不要往这个仓库里塞 Windows 专有内容。
 - **直连 `github.com` 会被墙，但 `api.github.com` 可以直连**——现象是 `gh` 建库/查 API 一切正常、`git push` 却超时（或报 HTTP2 framing error）。本仓库 `.git/config` 已写死 `http.proxy=http://127.0.0.1:7890` 与 `http.version=HTTP/1.1`，推送/拉取前确认本机代理在运行；凭据走 `credential.helper='!gh auth git-credential'`（Token 从 gh 钥匙串取，不落盘，不要改成把 Token 写进 URL）。
 - 永不提交：`history.db*`、`backend/data/`（备份目录）、`logs/`、`*.log*`、`.runtime_token`、`frontend/dist/`、`node_modules/`、`.venv/`、`*.tsbuildinfo`、编译产物 `frontend/vite.config.js` 与其 `.d.ts`。推前自查：`git ls-files | grep -Ei '\.env$|runtime_token|\.db|node_modules|dist/|\.log'` 应无输出。
 
@@ -54,7 +54,7 @@ backend/
 └── tests/               # pytest 单元/契约测试
 frontend/src/
 ├── views/               # ProjectList（榜单+采集中心入口）、ProjectDetail（详情）
-├── components/          # AppHeader/BaseSelect/CollectModal/DownloadPicker/FavoritesModal/RoundsModal/SettingsModal/UpdatesModal/ProjectCard
+├── components/          # AppHeader/BaseSelect/CollectModal/CategoryCleanupModal/DownloadPicker/FavoritesModal/RoundsModal/SettingsModal/UpdatesModal/ProjectCard
 ├── composables/         # 组合式复用逻辑
 ├── api.ts               # 所有后端调用集中在此
 └── router.ts
@@ -65,6 +65,23 @@ frontend/src/
 - 全部样式集中在 `frontend/src/style.css`（组件不写 scoped style）；颜色一律走主题变量（`--accent` / `--accent-deep` / `--accent-weak` / `--on-accent` 等），日/夜两套在 `[data-theme="light"]` 下覆盖，禁止硬编码色值。
 - 按钮统一 `.btn` 基底（含透明 1px 边框，保证同排按钮高度一致）+ 变体：`.dl` 实底主操作、`.ghost` 描边次级、`.prompt` 浅橙底次级（复制安装提示词专用）、`.small` 小号。
 - 弹窗统一 `.modal-overlay` + `.modal` 骨架（`DownloadPicker` 用 `.picker-mask/.picker` 类名，但遮罩/圆角/动画等视觉参数已与 modal 对齐——改一处要对照另一处）。
+
+## 分类清除（2026-10-23 落地）
+
+「功能菜单 → 清除分类项目」批量删除存量项目（用户误采不想要的分类），动这块前先读约束：
+
+- **匹配规则**：主分类 `category=?` **或** 附加分类数组命中——`db._category_tag_blob()` 把 JSON 数组剥成 `,A,B,` 标签串后 Python 侧精确比对（`json.dumps` 默认分隔符带空格，`LIKE` 粗筛 `%,名,%` 落空的历史 bug 就出在这；LIKE 只做预筛，**前缀同名分类（音乐 vs 音乐与阅读）靠标签串边界防误伤**）。
+- **收藏永不删**：命中项目里收藏的只把命中分类从附加字段摘除（`_cleanup_category_refs`），主分类不动。
+- **采集互斥**：`rounds` 表有 running → `POST /api/categories/cleanup` 返 409；预览接口 `preview-cleanup` 始终可用并带 `running` 标志（弹窗据此显示警告+禁选）。
+- **不做删除前备份**：目前没有恢复入口，备份无法回滚（已试过快照剔除方案，因 `_backup_clean_snapshot` 在 `Database` 非重入锁内调 `self.backup()` 死锁而废弃）。若重做该功能，备份必须**在锁外**取快照。日常备份仍由启动/每日 3:05 定时任务维护。
+- 级联清理无外键的 `health_snapshots`/`daily_picks`/`notifications` 中被删项目的行（其中 `daily_picks` 时间列叫 `created_at` 不叫 `picked_at`）。
+- 测试 `tests/test_category_cleanup.py`（8 项；夹具沿用 test_favorites.py 的 monkeypatch 模式）。
+
+## 列表自动刷新（2026-10-23 落地）
+
+- 采集落库后列表 30s 内自动更新：`AppHeader` 的既有轮询附带 `GET /api/stats`，`total_projects` 变化 → `window.dispatchEvent('starpick:projects-changed')` → `ProjectList.silentReload()` 静默重拉。
+- **silentReload 的守卫**：仅第一页且无分类/关键词/新增筛选时生效（翻页深处/带筛选不打扰，避免跳页）；比对用「id 逐位对齐 + total 相同」判定无变化——**别改回 Set 包含判定**（新项目 star 少排尾页时第一页内容完全一致但 total 已变，Set 判定会误判"无变化"导致 UI 卡在旧总数，实测踩过）。
+- 事件名 `starpick:projects-changed` 是 window 级全局契约，AppHeader 广播端与 ProjectList 监听端要同时改。
 
 ## 设置「关于」分组与应用自更新（2026-10-20 落地）
 
@@ -109,7 +126,9 @@ frontend/src/
 - 定时任务用单 worker 线程池串行：唤醒后多个任务同时到期时，并行提交会让后来者撞上"已有采集任务运行中"被整轮跳过（当日全量扫荡直接丢失）。
 - 排查"定时轮次没跑"先看 `/health` 的 `next_collect_at`/`next_full_at`：停在过去时间说明调度线程尚未被唤醒（休眠场景），而不是任务失败。
 - `backend/history.db*`、`logs/`、`frontend/dist/`、`node_modules/` 均已 gitignore，不要提交或手改。
-- **详情页直开/刷新必定是深色**：`index.html` 硬编码 `data-theme="dark"`，而主题切换按钮所在的 `AppHeader` 只在 `ProjectList.vue` 挂载——直接打开/刷新详情页会丢失日间主题且页面上无处切换（2026-10-18 已定位、未修；最小修法是在 `main.ts` 挂载前读 `localStorage` 主题）。别把它当成新引入的 bug。
+- **详情页直开/刷新必定是深色**：已修（2026-10-18 定位，2026-10-23 在 `main.ts` 挂载前读 `localStorage` 主题落地）。`index.html` 仍硬编码 `data-theme="dark"` 作为首帧兜底，属预期勿改。
+- **8000 端口的服务身份要先确认再操作**：`lsof -ti tcp:8000` + `ps` 看是 `uvicorn app.main:app`（开发服务，库 `backend/history.db`）还是 `/Applications/StarPick.app/Contents/MacOS/StarPick`（桌面壳，库 `~/Library/Application Support/StarPick/history.db`）。**桌面壳检测到 8000 被占会直接连占端口的服务开窗口**——验证安装包时如果开发服务还在跑，看到的"应用"其实是开发服务的页面；测试库里插数据前先确认服务用的是哪个库文件。
+- **空白库的桌面壳 ≠ 坏了**：安装包首次启动用全新空库（`~/Library/Application Support/StarPick/`），项目列表为空是正常的，第一轮采集后才有数据。
 - **详情接口响应会随语言数变大**：`/api/projects/{id}` 会带上全部语言正文（supabase 41 种语言约 600 KB 未压缩；列表接口走 `_LIST_COLS` 不返回这些大字段）。改详情接口时别顺手把语言字段塞进列表接口。
 - **浏览器自动化点长详情页会超时**：README 很长时 Playwright 的 `click()` 常超时（即使 `force: true`），改用 `locator.evaluate((el) => el.click())` 派发真实 DOM 点击触发 Vue 事件委托；页面里 `.markdown-body` 有多个（release 说明 + README），README 是最后一个。
 - **会话顶部注入的约束可能来自另一个项目**：`~/AGENTS.md` 写的是「街头美食社交平台」（React + Ant Design + Express + Prisma + MySQL），会被当作 workspace 约束注入到本仓库的会话里。那套规则（如「后端只允许改 backend/src/」）与本仓库布局不符，**一律以本文件为准**。
@@ -127,7 +146,8 @@ frontend/src/
 - **自检机制（CI 冒烟与打包验收依赖）**：`--selftest` 无窗口起服务→探活→校验静态页→退出。`STARPICK_SELFTEST=1` 会关闭启动补跑采集（空库 + 真 token 的组合绝不能发真实网络请求）；`STARPICK_SELFTEST_REPORT=<path>` 把输出写文件（Windows `console=False` 的 exe 在 CI 里 stdout 是 NUL，不写文件什么都看不到）；`STARPICK_SELFTEST_WEBVIEW=1` 额外校验 GUI 栈可导入。改 desktop/main/config 三者之一要复跑 `test_desktop.py` + `test_paths.py`。
 - **回环请求绝不走系统代理**：本机探测（/health、自检 GET）必须用 `desktop._urlopen_local()`（`ProxyHandler({})`）——macOS urllib 会读系统代理设置（Clash/表哥云），127.0.0.1 请求被转给代理后桌面壳会误报"启动失败"。WKWebView 自身直连回环，不受影响。
 - **构建入口与产物**：macOS `./packaging/macos/build_macos.sh [版本号]` → `packaging/dist/StarPick.app` + `StarPick-<版本>-arm64.dmg`（本地构建，构建用 `packaging/.venv-build`，勿用 Anaconda base——PyInstaller 不支持）；Windows `packaging/windows/build_windows.ps1` + `installer.iss`（Inno Setup，Per-user 无 UAC）→ CI `.github/workflows/build-windows.yml`（windows-latest 自带 Inno Setup 6，产物 `StarPick-*-setup.exe` + `selftest-report.txt`；tag `v*` 触发自动传 Release；要拿 `selftest-report.txt`/setup.exe 复盘用 `gh run download <run-id>`）。本机 PyInstaller 无法交叉编译 Windows 包，Windows 产物只能 CI 出；**验证 CI 包别解 Inno**——`gh run view --log` 的 `Compressing:` 行就是完整文件清单，版本读 setup.exe 内 UTF-16 版本资源（本机 innoextract 装不上，别再折腾）。
-- **版本号三处同步**：spec `VERSION`、`installer.iss` `MyAppVersion`、`app.main.APP_VERSION`（+ git tag 共四处）；改一处要同步其余。桌面壳窗口标题由 `desktop.py _window_title()` 生成（`STARPICK 拾星 vX.Y.Z`）。
+- **版本号三处同步**：spec `VERSION`、`installer.iss` `MyAppVersion`、`app.main.APP_VERSION`（+ git tag 共四处）；改一处要同步其余（2026-10-23 发过 v1.2.0，流程已完整走通）。桌面壳窗口标题由 `desktop.py _window_title()` 生成（`STARPICK 拾星 vX.Y.Z`）。
+- **macOS dmg 要手动补传 Release**：CI 只产 Windows setup.exe；macOS 包打完要 `gh release upload vX.Y.Z packaging/dist/StarPick-<版本>-arm64.dmg`（v1.0.0 起一直如此，v1.2.0 也补传过）。用户"从 GitHub 下载安装"的前提是线上资产齐全。
 - **卸载/升级保留数据**：Inno `[UninstallDelete]` 特意不删数据目录；v1.0.0→v1.1.0 实测可原地升级。
 
 ## 延伸阅读
@@ -135,5 +155,5 @@ frontend/src/
 - `README.md` — 功能全貌、API 一览、故障排查表（注意：第 15/91 行关于多语言 README 的描述还是「中/英」时代的写法，现状看上面那节）
 - `FORK.md` — 双机分叉基线与约定
 - `docs/下拉框排查经验库.md` — 前端下拉框问题排查经验
-- `docs/Windows-1.1.0-安装包实测清单.md` — Windows 包人工实测验收清单（含 v1.0.0→v1.1.0 升级路径与错误场景判读）
+- `docs/Windows-1.1.0-安装包实测清单.md` — Windows 包人工实测验收清单（含原地升级路径与错误场景判读；文件名版本号随发布更新，留意实际存在哪个版本）
 - `可行性分析报告.md` / `生产级优化方案.md` — 立项分析与优化路线（历史文档，不一定反映现状）
