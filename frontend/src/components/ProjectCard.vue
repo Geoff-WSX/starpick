@@ -60,6 +60,14 @@ function openDetail() {
   router.push(`/project/${props.project.id}`)
 }
 
+/** 安装包还没探测到（后台逐个查 release，无 Token 限速 60 个/小时） */
+const probing = computed(() => props.project.assets.length === 0 && !props.project.assets_probed)
+
+/** 点「检测中」标签 → 打开采集中心看探测进度（AppHeader 监听同一全局事件） */
+function openCollect() {
+  window.dispatchEvent(new CustomEvent('starpick:open-collect'))
+}
+
 /** 有安装包 → 弹出版本选择；无安装包 → 卡片按钮改走安装提示词（见 openInstallPrompt） */
 function download() {
   if (props.project.assets.length > 0) {
@@ -124,7 +132,19 @@ function openInstallPrompt() {
     </div>
 
     <div class="card-foot">
-      <template v-if="project.assets.length === 0">
+      <template v-if="probing">
+        <button
+          class="probe-chip"
+          title="正在后台逐个探测 GitHub release（无 Token 时限速约 60 个/小时），完成后这里会出现「下载版本」按钮。点击查看探测进度"
+          @click.stop="openCollect"
+        >安装包检测中…</button>
+        <button
+          class="btn prompt"
+          title="复制安装提示词，发给豆包等能操作电脑的 AI 助手，让它帮你安装"
+          @click.stop="openInstallPrompt"
+        >复制安装提示词</button>
+      </template>
+      <template v-else-if="project.assets.length === 0">
         <button
           class="btn dl"
           title="复制安装提示词，发给豆包等能操作电脑的 AI 助手，让它帮你安装"

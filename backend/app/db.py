@@ -198,7 +198,8 @@ _SCHEMAS: list[str] = [
 _LIST_COLS = (
     "id, full_name, name, owner, description, homepage, stars, language, pushed_at, "
     "html_url, topics, platforms, system_requirements, download_url, zh_friendly, "
-    "category, major_version, lang, assets, first_seen_at, last_recommended_at, categories"
+    "category, major_version, lang, assets, assets_probed, "
+    "first_seen_at, last_recommended_at, categories"
 )
 
 
@@ -908,6 +909,13 @@ class Database:
             return self._conn.execute(
                 "SELECT COUNT(*) FROM projects "
                 "WHERE assets IS NOT NULL AND assets != '' AND assets != '[]'"
+            ).fetchone()[0]
+
+    def count_projects_pending_probe(self) -> int:
+        """尚未探测过 release 的项目数（顶栏「安装包检测 N/M」进度分母分子用）。"""
+        with self._lock:
+            return self._conn.execute(
+                "SELECT COUNT(*) FROM projects WHERE COALESCE(assets_probed, 0)=0"
             ).fetchone()[0]
 
     def search_projects(self, category: str | None = None, keyword: str = "",

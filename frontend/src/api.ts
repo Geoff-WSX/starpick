@@ -42,6 +42,8 @@ export interface Project {
   system_requirements: string[]
   download_url: string
   assets: Asset[]
+  /** release 是否已探测过：false 且 assets 为空 =「安装包检测中」态 */
+  assets_probed?: boolean
   zh_friendly: boolean
   category: string
   /** 附加分类（跨界项目多分类标注；不含主分类时前端按主分类兜底） */
@@ -119,6 +121,8 @@ export interface StatsResponse {
   total_projects: number
   /** 已探测到安装包的项目数（assets 回填进度信号） */
   assets_ready: number
+  /** 尚未探测 release 的项目数（顶栏「安装包检测 N/M」进度，全部完成归零） */
+  assets_pending: number
   recent_rounds: number
   rounds_by_status: Record<string, number>
   categories_summary: Record<string, number>

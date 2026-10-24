@@ -60,6 +60,8 @@ def client(tmp_path, monkeypatch):
     })
     rid = db.create_round("2026-10-08 00:00:00")
     db.finish_round(rid, "success", {"影视": 2}, {"inserted": 2})
+    # app-a 已探测过 release（有 assets）；app-zh 未探测 → 检测中态
+    db.mark_assets_probed("org/app-a")
 
     main.state.cfg = cfg
     main.state.db = db
@@ -92,9 +94,12 @@ def test_list_projects(client):
     assert len(item["assets"]) == 2
     assert item["assets"][0]["platform"] == "Windows"
     assert item["assets"][1]["platform"] == "Android"
+    assert item["assets_probed"] is True
     assert item["lang"] == "en"
     zh_item = next(i for i in body["items"] if i["full_name"] == "org/app-zh")
     assert zh_item["lang"] == "zh"
+    # 未探测过 release → 前端据此渲染「安装包检测中」态
+    assert zh_item["assets_probed"] is False
 
 
 def test_list_projects_filter_by_category(client):
@@ -275,6 +280,8 @@ def test_stats(client):
     assert body["rounds_by_status"]["success"] >= 1
     # assets_ready：安装包探测回填的变更信号（前端自动刷新据此广播）
     assert body["assets_ready"] == 1  # 夹具里 app-a 带 assets、app-zh 无
+    # assets_pending：未探测项目数（顶栏「安装包检测 N/M」进度）
+    assert body["assets_pending"] == 1  # app-zh 未探测
 
 
 def test_run_returns_service_unavailable(client):

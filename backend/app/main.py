@@ -507,6 +507,8 @@ class ProjectOut(BaseModel):
     system_requirements: list[str]
     download_url: str
     assets: list[dict[str, Any]]
+    # release 是否已探测过：前端区分「没有安装包」与「还没检测到」（检测中态）
+    assets_probed: bool = False
     zh_friendly: bool
     category: str
     lang: str
@@ -921,6 +923,8 @@ def stats() -> dict[str, Any]:
         "total_projects": total,
         # assets 探测回填只更新已有行、不改总数：前端自动刷新需要第二个变更信号
         "assets_ready": state.db.count_projects_with_assets(),
+        # 尚未探测 release 的项目数：顶栏「安装包检测 N/M」进度（全部探测完归零隐藏）
+        "assets_pending": state.db.count_projects_pending_probe(),
         "recent_rounds": len(rounds),
         "rounds_by_status": {
             status: sum(1 for r in rounds if r["status"] == status)
@@ -957,6 +961,7 @@ def _project_out(row, new_since: str = "") -> ProjectOut:
         topics=_json_list(row["topics"]), platforms=_json_list(row["platforms"]),
         system_requirements=_json_list(row["system_requirements"]),
         download_url=row["download_url"] or "", assets=_json_list(row["assets"]),
+        assets_probed=bool(row["assets_probed"]) if "assets_probed" in row.keys() else bool(row["assets"]),
         zh_friendly=bool(row["zh_friendly"]),
         category=row["category"], lang=row["lang"] or "en",
         first_seen_at=row["first_seen_at"],

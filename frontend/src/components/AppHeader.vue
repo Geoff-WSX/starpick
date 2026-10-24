@@ -83,9 +83,14 @@ const notifLimit = ref(15)
 const notifLoadedAll = ref(false)
 
 // 变更基线：首次拉取只记值不广播（页面初始加载会拉一遍列表），之后变化才广播。
-// total 盯采集增删；assets_ready 盯 release 探测回填（只改已有行，总数不变）
+// total 盯采集增删；ready 盯探测出安装包；pending 盯探测结论为「确无 release」
 let lastTotal = -1
 let lastAssetsReady = -1
+let lastAssetsPending = -1
+
+// 安装包探测进度（还有未探测项目时在状态行展示；无 Token 追加速慢提示）
+const probeTotal = ref(0)
+const probePending = ref(0)
 
 async function loadMeta() {
   try {
@@ -95,13 +100,21 @@ async function loadMeta() {
   // （列表只在筛选条件变化时重载，不通知的话新项目/新探测出的安装包要切一下分类才出现。）
   try {
     const stats = await fetchStats()
+    // 三个信号任一变化都广播：总数（采集增删）、ready（探测出安装包）、
+    // pending（探测结论为「确无 release」——前两者都不动，只有它减一）
     const changed = lastTotal >= 0
-      && (stats.total_projects !== lastTotal || stats.assets_ready !== lastAssetsReady)
+      && (stats.total_projects !== lastTotal
+        || stats.assets_ready !== lastAssetsReady
+        || stats.assets_pending !== lastAssetsPending)
     if (changed) {
       window.dispatchEvent(new CustomEvent('starpick:projects-changed'))
     }
     lastTotal = stats.total_projects
     lastAssetsReady = stats.assets_ready
+    lastAssetsPending = stats.assets_pending
+    // 顶栏进度：还有未探测项目时显示「安装包检测 已完成/总数」
+    probeTotal.value = stats.total_projects
+    probePending.value = stats.assets_pending
   } catch { /* 忽略 */ }
 }
 
@@ -156,16 +169,23 @@ function goNotif(n: NotificationItem) {
 
 let timer: ReturnType<typeof setInterval> | undefined
 let notifTimer: ReturnType<typeof setInterval> | undefined
+/** 卡片「安装包检测中」标签点击 → 打开采集中心（看探测进度） */
+function onOpenCollect() {
+  openModal('collect')
+}
+
 onMounted(() => {
   initTheme()
   loadMeta()
   loadNotifications()
   timer = setInterval(loadMeta, 30000)
   notifTimer = setInterval(loadNotifications, 60000)
+  window.addEventListener('starpick:open-collect', onOpenCollect)
 })
 onUnmounted(() => {
   if (timer) clearInterval(timer)
   if (notifTimer) clearInterval(notifTimer)
+  window.removeEventListener('starpick:open-collect', onOpenCollect)
 })
 </script>
 
@@ -185,6 +205,9 @@ onUnmounted(() => {
         后端 {{ health?.status === 'ok' ? '在线' : health ? '异常' : '连接中…' }}
         <template v-if="health?.next_collect_at">
           · 下次采集 {{ new Date(health.next_collect_at).toLocaleString('zh-CN') }}
+        </template>
+        <template v-if="probePending > 0">
+          · 安装包检测 {{ probeTotal - probePending }}/{{ probeTotal }}<template v-if="health && health.has_token === false">（未配 Token，速度受限）</template>
         </template>
       </span>
     </div>

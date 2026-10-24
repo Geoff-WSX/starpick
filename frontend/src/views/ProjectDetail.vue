@@ -552,6 +552,10 @@ function back() {
             </div>
             <button class="btn prompt" title="查看安装提示词全文，复制给豆包等能操作电脑的 AI 助手，让它帮你安装" @click="openInstallPrompt">复制安装提示词</button>
           </template>
+          <template v-else-if="!detail.assets_probed">
+            <button class="btn dl" @click="openInstallPrompt">复制安装提示词</button>
+            <span class="probe-chip" title="正在后台探测 GitHub release，完成后这里会出现下载按钮；无 Token 时限速约 60 个/小时">安装包检测中…</span>
+          </template>
           <button v-else class="btn dl" @click="openInstallPrompt">复制安装提示词</button>
           <span class="actions-spacer"></span>
           <button class="btn ghost" title="需可访问 GitHub 的网络；打不开时可直接使用下方站内 README" @click="external(detail.html_url)">
@@ -560,7 +564,8 @@ function back() {
         </div>
         <!-- 安装提示词的说明独占一行，不再插在按钮之间 -->
         <p class="actions-hint">
-          <template v-if="detail.assets.length === 0">没有现成安装包？</template>
+          <template v-if="detail.assets.length === 0 && !detail.assets_probed">安装包还在检测中？</template>
+          <template v-else-if="detail.assets.length === 0">没有现成安装包？</template>
           复制安装提示词发给豆包等 AI 助手（选「本地电脑模式」），它会帮你下载、装好并运行
         </p>
         <p v-if="matchedAssets.length" class="actions-hint">{{ matchedAssets[0].name }}（{{ formatSize(matchedAssets[0].size) }}） · 点击下方列表文件名也可直接下载</p>

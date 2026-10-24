@@ -977,6 +977,43 @@ a:hover {
   padding: 7px 10px;
 }
 
+/* 安装包检测中标签：后台还在逐个探测 release（卡片与详情页共用） */
+.probe-chip {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 7px 10px;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px dashed var(--border, rgba(128, 138, 157, 0.4));
+  border-radius: 10px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.probe-chip::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: probe-pulse 1.6s ease-in-out infinite;
+}
+.probe-chip:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+@keyframes probe-pulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+/* 详情页里 chip 与按钮并排，不拉伸占满 */
+.actions .probe-chip {
+  flex: 0 0 auto;
+}
+
 .btn.dl {
   background: var(--accent);
 }
