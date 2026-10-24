@@ -32,7 +32,7 @@ cd frontend && npm run dev      # http://localhost:5173
 
 ## Git 与远端
 
-- 仓库 `https://github.com/Geoff-WSX/starpick`（分支 `main`，已公开；2026-10-23 已发布 v1.2.0，tag 触发 Windows CI 自动产 setup.exe 上 Release，macOS dmg 手动补传）。Windows 分支不在同一仓库（见 FORK.md），不要往这个仓库里塞 Windows 专有内容。
+- 仓库 `https://github.com/Geoff-WSX/starpick`（分支 `main`，已公开；2026-10-24 已发布 v1.3.0，tag 触发 Windows CI 自动产 setup.exe 上 Release，macOS dmg 手动补传）。Windows 分支不在同一仓库（见 FORK.md），不要往这个仓库里塞 Windows 专有内容。
 - **直连 `github.com` 会被墙，但 `api.github.com` 可以直连**——现象是 `gh` 建库/查 API 一切正常、`git push` 却超时（或报 HTTP2 framing error）。本仓库 `.git/config` 已写死 `http.proxy=http://127.0.0.1:7890` 与 `http.version=HTTP/1.1`，推送/拉取前确认本机代理在运行；凭据走 `credential.helper='!gh auth git-credential'`（Token 从 gh 钥匙串取，不落盘，不要改成把 Token 写进 URL）。
 - 永不提交：`history.db*`、`backend/data/`（备份目录）、`logs/`、`*.log*`、`.runtime_token`、`frontend/dist/`、`node_modules/`、`.venv/`、`*.tsbuildinfo`、编译产物 `frontend/vite.config.js` 与其 `.d.ts`。推前自查：`git ls-files | grep -Ei '\.env$|runtime_token|\.db|node_modules|dist/|\.log'` 应无输出。
 
@@ -77,11 +77,13 @@ frontend/src/
 - 级联清理无外键的 `health_snapshots`/`daily_picks`/`notifications` 中被删项目的行（其中 `daily_picks` 时间列叫 `created_at` 不叫 `picked_at`）。
 - 测试 `tests/test_category_cleanup.py`（8 项；夹具沿用 test_favorites.py 的 monkeypatch 模式）。
 
-## 列表自动刷新（2026-10-23 落地）
+## 列表自动刷新与安装包检测进度（2026-10-24 落地）
 
-- 采集落库后列表 30s 内自动更新：`AppHeader` 的既有轮询附带 `GET /api/stats`，`total_projects` 变化 → `window.dispatchEvent('starpick:projects-changed')` → `ProjectList.silentReload()` 静默重拉。
-- **silentReload 的守卫**：仅第一页且无分类/关键词/新增筛选时生效（翻页深处/带筛选不打扰，避免跳页）；比对用「id 逐位对齐 + total 相同」判定无变化——**别改回 Set 包含判定**（新项目 star 少排尾页时第一页内容完全一致但 total 已变，Set 判定会误判"无变化"导致 UI 卡在旧总数，实测踩过）。
-- 事件名 `starpick:projects-changed` 是 window 级全局契约，AppHeader 广播端与 ProjectList 监听端要同时改。
+- 采集落库/安装包探测回填后列表 30s 内自动更新：`AppHeader` 的既有轮询附带 `GET /api/stats`，**三个信号任一变化**即 `window.dispatchEvent('starpick:projects-changed')` → `ProjectList.silentReload()` 静默重拉：`total_projects`（采集增删）、`assets_ready`（探测出安装包）、`assets_pending`（探测结论为「确无 release」——前两者都不动，只有它减一，漏了它卡片「检测中」态翻不掉）。
+- **silentReload 的守卫**：仅第一页且无分类/关键词/新增筛选时生效（翻页深处/带筛选不打扰，避免跳页）；无变化判定用签名 `id:assets数:probed位` 逐项拼接比对——**别改成 Set 包含判定**（新项目 star 少排尾页时第一页 id 完全一致但 total 已变，Set 判定会误判"无变化"，实测踩过）。
+- **安装包三态**：`assets 非空`→「下载版本 · N 个」；`assets 空且 assets_probed`→只有复制提示词；`assets 空且未探测`→「安装包检测中…」标签（`.probe-chip` 样式，点击经 `starpick:open-collect` 事件由 AppHeader 打开采集中心）。`assets_probed` 已进 `_LIST_COLS` 与 `ProjectOut`，详情页主按钮同三态。
+- 顶栏状态行在有未探测项目时显示「安装包检测 已完成/总数」，未配 Token 追加限速提示；全部探测完自动隐藏。
+- 两个事件名 `starpick:projects-changed` / `starpick:open-collect` 是 window 级全局契约，广播端（AppHeader）与监听端要同时改。
 
 ## 设置「关于」分组与应用自更新（2026-10-20 落地）
 
@@ -113,8 +115,9 @@ frontend/src/
 ## 配置与密钥
 
 - 所有配置集中在 `backend/config.yaml`，改后需重启；启动时强校验，报错会定位具体配置键。
+- **定时采集配置键已删除（2026-10-24）**：`interval_hours`/`full_sweep_hour`/`update_interval_hours`/`catchup_threshold_rounds` 不再存在；升级用户的旧 config.yaml 里残留这些键会被静默忽略，不要因为"键还在旧文件里"就恢复定时逻辑。现存 schedule 键仅 `discovery_created_hours`/`timezone`/`misfire_grace_seconds`。
 - `GITHUB_TOKEN` 只允许两个来源：`backend/.env`（已 gitignore）或前端设置页保存的 runtime token（`backend/.runtime_token`，热生效）。**绝不写入 config.yaml、绝不入库、绝不提交**。
-- 无 Token 时为匿名限流（搜索 10 次/分钟、core 60 次/小时），一轮采集 15-30 分钟属正常，限流器自动排队，不要为此"修复"。
+- 无 Token 时为匿名限流（搜索 10 次/分钟、core 60 次/小时），手动全量一轮 15-30 分钟属正常，限流器自动排队，不要为此"修复"。
 
 ## 已知陷阱
 
