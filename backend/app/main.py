@@ -39,7 +39,7 @@ from .config import (
 from .db import Database
 from .github_api import resolve_repo_path, variant_lang
 
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.2.1"
 # 项目仓库地址（设置弹窗「关于」分组展示 + 更新检查）；仓库转公开后无需改代码，
 # 无 token 用户即可匿名查到 Releases
 GITHUB_REPO = "Geoff-WSX/starpick"
