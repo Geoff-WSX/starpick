@@ -273,6 +273,8 @@ def test_stats(client):
     body = resp.json()
     assert body["total_projects"] == 2
     assert body["rounds_by_status"]["success"] >= 1
+    # assets_ready：安装包探测回填的变更信号（前端自动刷新据此广播）
+    assert body["assets_ready"] == 1  # 夹具里 app-a 带 assets、app-zh 无
 
 
 def test_run_returns_service_unavailable(client):

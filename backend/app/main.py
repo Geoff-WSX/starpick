@@ -39,7 +39,7 @@ from .config import (
 from .db import Database
 from .github_api import resolve_repo_path, variant_lang
 
-APP_VERSION = "1.2.1"
+APP_VERSION = "1.2.2"
 # 项目仓库地址（设置弹窗「关于」分组展示 + 更新检查）；仓库转公开后无需改代码，
 # 无 token 用户即可匿名查到 Releases
 GITHUB_REPO = "Geoff-WSX/starpick"
@@ -919,6 +919,8 @@ def stats() -> dict[str, Any]:
             by_category[cat] = by_category.get(cat, 0) + int(n or 0)
     return {
         "total_projects": total,
+        # assets 探测回填只更新已有行、不改总数：前端自动刷新需要第二个变更信号
+        "assets_ready": state.db.count_projects_with_assets(),
         "recent_rounds": len(rounds),
         "rounds_by_status": {
             status: sum(1 for r in rounds if r["status"] == status)

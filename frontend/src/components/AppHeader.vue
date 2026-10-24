@@ -82,21 +82,26 @@ const notifLoading = ref(false)
 const notifLimit = ref(15)
 const notifLoadedAll = ref(false)
 
-// 项目总数基线：首次拉取只记值不广播（页面初始加载会拉一遍列表），之后变化才广播
+// 变更基线：首次拉取只记值不广播（页面初始加载会拉一遍列表），之后变化才广播。
+// total 盯采集增删；assets_ready 盯 release 探测回填（只改已有行，总数不变）
 let lastTotal = -1
+let lastAssetsReady = -1
 
 async function loadMeta() {
   try {
     health.value = await fetchHealth()
   } catch { /* 忽略 */ }
-  // 顺带盯项目总数：采集轮次落库后 total_projects 变化 → 广播给列表页静默刷新。
-  // （列表只在筛选条件变化时重载，不通知的话新项目要切一下分类才出现。）
+  // 顺带盯项目总数与安装包就绪数：采集落库 / assets 后台探测回填 → 广播给列表页静默刷新。
+  // （列表只在筛选条件变化时重载，不通知的话新项目/新探测出的安装包要切一下分类才出现。）
   try {
     const stats = await fetchStats()
-    if (lastTotal >= 0 && stats.total_projects !== lastTotal) {
+    const changed = lastTotal >= 0
+      && (stats.total_projects !== lastTotal || stats.assets_ready !== lastAssetsReady)
+    if (changed) {
       window.dispatchEvent(new CustomEvent('starpick:projects-changed'))
     }
     lastTotal = stats.total_projects
+    lastAssetsReady = stats.assets_ready
   } catch { /* 忽略 */ }
 }
 

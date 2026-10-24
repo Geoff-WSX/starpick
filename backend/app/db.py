@@ -902,6 +902,14 @@ class Database:
         with self._lock:
             return self._conn.execute("SELECT COUNT(*) FROM projects").fetchone()[0]
 
+    def count_projects_with_assets(self) -> int:
+        """已有安装包记录的项目数（assets 探测回填的变更信号，供前端自动刷新）。"""
+        with self._lock:
+            return self._conn.execute(
+                "SELECT COUNT(*) FROM projects "
+                "WHERE assets IS NOT NULL AND assets != '' AND assets != '[]'"
+            ).fetchone()[0]
+
     def search_projects(self, category: str | None = None, keyword: str = "",
                         lang: str = "", page: int = 1, page_size: int = 20,
                         sort: str = "stars", new_since: str = "") -> tuple[list[sqlite3.Row], int]:

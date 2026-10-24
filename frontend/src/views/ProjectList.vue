@@ -154,10 +154,11 @@ async function silentReload() {
       page_size: pageSize,
       sort: sort.value,
     })
-    const unchangedIds = data.total === total.value
-      && data.items.length === projects.value.length
-      && data.items.every((p, i) => p.id === projects.value[i]?.id)
-    if (unchangedIds) return // 页面与库完全一致才不动 DOM
+    // 签名含各项目 assets 数：assets 后台探测回填不改总数、不动排序，
+    // 但卡片要长出「下载版本」按钮；纯浏览量等无关变化仍不打扰 DOM
+    const sig = (items: { id: number; assets: unknown[] }[]) =>
+      items.map((p) => `${p.id}:${p.assets.length}`).join(',')
+    if (data.total === total.value && sig(data.items) === sig(projects.value)) return
     projects.value = data.items
     total.value = data.total
   } catch { /* 下次轮询再试 */ }

@@ -21,7 +21,7 @@ CONFIG_YAML = BACKEND / "config.yaml"
 ICON = ROOT / "packaging" / ("icon.icns" if sys.platform == "darwin" else "icon.ico")
 
 APP_NAME = "StarPick"
-VERSION = "1.2.1"
+VERSION = "1.2.2"
 
 if not (FRONTEND_DIST / "index.html").is_file():
     raise SystemExit("缺少前端构建产物 frontend/dist/index.html，请先在 frontend/ 下执行 npm run build")

@@ -117,6 +117,8 @@ export interface RoundInfo {
 
 export interface StatsResponse {
   total_projects: number
+  /** 已探测到安装包的项目数（assets 回填进度信号） */
+  assets_ready: number
   recent_rounds: number
   rounds_by_status: Record<string, number>
   categories_summary: Record<string, number>
