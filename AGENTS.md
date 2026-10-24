@@ -32,7 +32,7 @@ cd frontend && npm run dev      # http://localhost:5173
 
 ## Git 与远端
 
-- 仓库 `https://github.com/Geoff-WSX/starpick`（分支 `main`，已公开；2026-10-24 已发布 v1.3.0，tag 触发 Windows CI 自动产 setup.exe 上 Release，macOS dmg 手动补传）。Windows 分支不在同一仓库（见 FORK.md），不要往这个仓库里塞 Windows 专有内容。
+- 仓库 `https://github.com/Geoff-WSX/starpick`（分支 `main`，已公开）。**2026-10-24 版本重置：v1.0.0~v1.3.0 均为测试版，其 Release（含资产）与 tag 已全部删除，正式版从 v1.0 起步**；tag 触发 Windows CI 自动产 setup.exe 上 Release，macOS dmg 手动补传。Windows 分支不在同一仓库（见 FORK.md），不要往这个仓库里塞 Windows 专有内容。
 - **直连 `github.com` 会被墙，但 `api.github.com` 可以直连**——现象是 `gh` 建库/查 API 一切正常、`git push` 却超时（或报 HTTP2 framing error）。本仓库 `.git/config` 已写死 `http.proxy=http://127.0.0.1:7890` 与 `http.version=HTTP/1.1`，推送/拉取前确认本机代理在运行；凭据走 `credential.helper='!gh auth git-credential'`（Token 从 gh 钥匙串取，不落盘，不要改成把 Token 写进 URL）。
 - 永不提交：`history.db*`、`backend/data/`（备份目录）、`logs/`、`*.log*`、`.runtime_token`、`frontend/dist/`、`node_modules/`、`.venv/`、`*.tsbuildinfo`、编译产物 `frontend/vite.config.js` 与其 `.d.ts`。推前自查：`git ls-files | grep -Ei '\.env$|runtime_token|\.db|node_modules|dist/|\.log'` 应无输出。
 
