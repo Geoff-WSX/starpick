@@ -216,6 +216,13 @@ function selectCategory(c: string) {
 }
 
 // 「中文」走中文友好口径（zh=1，比简介语言判定更全）；「英文」仍按简介语言。组内单选。
+/** 语言组激活态：''（全部）只在整组无选择时亮——选中文时 lang 为空但 zh=1，不能两个同亮 */
+function isLangActive(v: string) {
+  if (v === '') return !lang.value && onlyZh.value !== '1'
+  if (v === 'zh') return onlyZh.value === '1'
+  return lang.value === v
+}
+
 function selectLang(l: string) {
   if (l === 'zh') {
     const on = onlyZh.value === '1'
@@ -388,7 +395,7 @@ onUnmounted(() => {
           v-for="l in LANGS"
           :key="l.value"
           class="chip lang-chip"
-          :class="{ active: l.value === 'zh' ? onlyZh === '1' : lang === l.value }"
+          :class="{ active: isLangActive(l.value) }"
           :title="l.value === 'zh' ? '中文友好项目：简介为中文，或对中文用户友好（含中文文档/界面）' : undefined"
           @click="selectLang(l.value)"
         >
