@@ -113,8 +113,10 @@ def _asset_platform(name: str) -> str:
 def build_category_queries(keywords: list[str], min_stars: int, pushed_cutoff: str) -> list[str]:
     """把分类关键词拆成若干次 OR 查询（每组 ≤6 关键词，规避 GitHub 5 运算符上限）。
 
-    - 中文关键词加引号保证精确短语匹配（"追剧" 与 "番剧采集" 分词语义不同）
-    - 英文关键词不加引号，容忍复数/派生形态（anime → animes）
+    - 中文与英文多词关键词都加引号保证短语语义——多词不加引号会被 GitHub 拆散成
+      裸词 OR（"game framework" → game OR framework），framework/engine 这类裸词
+      曾把 tensorflow/bootstrap 整批捞进「游戏开发」（2026-10 实测 40% 错类污染）
+    - 单个英文词不加引号，GitHub 自带词干匹配（anime → animes）
     - 返回列表；调用方对每组结果合并后按 star 取 top，重叠候选天然去重
     """
     terms: list[str] = []
@@ -122,7 +124,10 @@ def build_category_queries(keywords: list[str], min_stars: int, pushed_cutoff: s
         kw = (kw or "").strip()
         if not kw:
             continue
-        terms.append(f'"{kw}"' if _CJK_RE.search(kw) else kw)
+        if _CJK_RE.search(kw) or len(kw.split()) > 1:
+            terms.append(f'"{kw}"')
+        else:
+            terms.append(kw)
     if not terms:
         return []
     queries: list[str] = []
@@ -140,6 +145,23 @@ def build_category_queries(keywords: list[str], min_stars: int, pushed_cutoff: s
 def _pushed_cutoff(max_inactive_days: int) -> str:
     cutoff = datetime.now(timezone.utc) - timedelta(days=max_inactive_days)
     return cutoff.strftime("%Y-%m-%d")
+
+
+# 无边界要求域代码（camel/下划线拼接）：TVBoxOSC、m3u8 流工具等
+_SUBSTR_WORDS = {"tvbox"}
+
+
+def _english_word_pattern(word: str) -> re.Pattern:
+    """英文单词 → 匹配模式：域代码子串 / 长词词边界+词形变体 / 短词严格词边界。
+
+    变体（复数/ing/ed）只给 ≥5 字母的词：agent→agents、prompt→prompts；
+    短词开变体会放大噪声（rag→rags、ai→aimed 的误配在实测中出现过）。
+    """
+    if word in _SUBSTR_WORDS or (not word.isalpha() and len(word) <= 6):
+        return re.compile(re.escape(word))
+    if len(word) >= 5:
+        return re.compile(r"\b" + re.escape(word) + r"(s|es|ed|ing)?\b")
+    return re.compile(r"\b" + re.escape(word) + r"\b")
 
 
 def _local_today(timezone_name: str) -> str:
@@ -459,6 +481,10 @@ class Collector:
         else:
             pushed_cutoff = None  # 不限活跃时间：不拼 pushed 条件
         done = 0
+        # 本地复检模式（与发现轮同规则）：GitHub 搜索带词干/分词匹配，宽词干曾把
+        # "streamed from disk" 的 MoE 引擎当流媒体收进影视——搜索结果必须本地过关键词
+        all_patterns = self._category_patterns()
+        total_dropped = 0
         for category, keywords in cats.items():
             self.progress.set(
                 message=f"正在搜索分类「{category}」",
@@ -482,6 +508,10 @@ class Collector:
                     full_name = it.get("full_name", "")
                     if not full_name:
                         continue
+                    cat_patterns = [(name, p) for name, p in all_patterns if name == category]
+                    if cat_patterns and not _match_categories(it, cat_patterns):
+                        total_dropped += 1
+                        continue
                     cat_hits.append(_to_candidate(it, category))
             # 每分类按 star 预排后全量纳入（受本轮 per_cat 上限约束）
             cat_hits.sort(key=lambda c: c["stars"], reverse=True)
@@ -494,6 +524,9 @@ class Collector:
                 categories_done=done,
                 message=f"分类搜索完成 {done}/{categories_total}",
             )
+
+        if total_dropped:
+            log.info("本地复检：丢弃 %d 条词干/分词误伤的搜索结果", total_dropped)
 
         if not candidates:
             return {
@@ -535,7 +568,11 @@ class Collector:
 
         语义对齐 GitHub 搜索查询构造（build_category_queries）：
         - 含中文关键词 → 引号短语 ≈ 子串匹配
-        - 纯英文关键词 → 各词独立出现即命中（GitHub 隐式 AND），\\b 防止 rag⊂storage 类误配
+        - 纯英文关键词 → 各词独立出现即命中（GitHub 隐式 AND）
+        - 英文单词允许词形变体（agent → agents/agented；GitHub 搜索自带词干，
+          本地不放宽会误杀合法结果），\\b 词边界防 rag⊂storage 类误配
+        - 含数字/连字符的短代码（m3u8 / yt-dlp / tvbox）用子串——N_m3u8DL-RE、
+          TVBoxOSC 这类无边界写法靠 \\b 匹配不到
         """
         cats: dict[str, list[str]] = {k: list(v) for k, v in self.cfg.categories.items()}
         for row in self.db.list_custom_categories():
@@ -554,7 +591,7 @@ class Collector:
                     compiled.append(("sub", [re.compile(re.escape(low))]))
                 else:
                     compiled.append(("words", [
-                        re.compile(r"\b" + re.escape(w) + r"\b") for w in low.split()
+                        _english_word_pattern(w) for w in low.split()
                     ]))
             if compiled:
                 patterns.append((name, compiled))

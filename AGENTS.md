@@ -152,6 +152,14 @@ frontend/src/
 - **macOS dmg 要手动补传 Release**：CI 只产 Windows setup.exe；macOS 包打完要 `gh release upload vX.Y.Z packaging/dist/StarPick-<版本>-arm64.dmg`（v1.0.0 起一直如此，v1.2.0 也补传过）。用户"从 GitHub 下载安装"的前提是线上资产齐全。
 - **卸载/升级保留数据**：Inno `[UninstallDelete]` 特意不删数据目录；v1.0.0→v1.1.0 实测可原地升级。
 
+## 采集分类匹配契约（2026-10-25 修复后）
+
+- **英文多词关键词必须短语化**：`build_category_queries` 对多词英文加引号——不加引号会被 GitHub 拆成裸词 OR（"game framework"→game OR framework），裸词 framework/engine 曾把 40% 的库错分类（tensorflow 进游戏开发、storybook 进加速工具）。
+- **全量扫荡有本地复检**：搜索结果逐条过 `_category_patterns`（名称+简介+topics），不命中被搜分类的关键词即丢弃（`_run` 内 `_match_categories`）——GitHub 词干匹配的误伤（"streamed from disk" 的 MoE 引擎进影视）被这层拦下。
+- **本地匹配规则**（`_english_word_pattern`）：≥5 字母英文词带词形变体（agent→agents）；≤4 字母严格词边界（rag 不得命中 storage/rags）；域代码（m3u8/yt-dlp/tvbox）子串匹配；中文关键词子串。**改动前先跑 test_collector 的复检用例**。
+- **关键词表红线**：影视不放裸词 `streaming`（词干误伤 ML 项目），用 `video streaming` 短语；`开发` 收 framework/runtime/sdk 等通用开发词是有意为之（开发框架类归开发）。
+- 存量库 2026-10-25 做过一次手术：327 个按关键词证据迁移 + 57 个高星人工认领（colibri→AI工具 等），无关键词证据但语义合理的保留原类——不要按「关键词不命中=删」清库。
+
 ## 延伸阅读
 
 - `README.md` — 功能全貌、API 一览、故障排查表（注意：第 15/91 行关于多语言 README 的描述还是「中/英」时代的写法，现状看上面那节）

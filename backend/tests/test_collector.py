@@ -48,7 +48,8 @@ class FakeClient:
 
 def _single_cfg() -> Config:
     cfg = Config()
-    cfg.categories = {"影视": ["追剧"]}
+    # "desc of" 与 _item() 的假描述对齐（全量扫荡现做本地关键词复检，见 test_full_sweep_recheck）
+    cfg.categories = {"影视": ["desc of"]}
     cfg.per_category_top = 5
     cfg.concurrency = 2
     cfg.skip_existing_days = 0   # 默认测试全量刷新；跳过逻辑由专门用例验证
@@ -625,7 +626,7 @@ def _json(raw: str) -> list:
 def _multi_cfg() -> Config:
     """两个分类的配置：游戏先搜、效率工具后搜（用于验证跨分类合并）。"""
     cfg = Config()
-    cfg.categories = {"游戏": ["游戏引擎"], "效率工具": ["game speed"]}
+    cfg.categories = {"游戏": ["desc of"], "效率工具": ["desc of"]}
     cfg.per_category_top = 5
     cfg.concurrency = 2
     return cfg
@@ -742,7 +743,9 @@ def test_discovery_round_matches_categories_locally(tmp_path):
         {**_item("org/new-anime", 5000), "description": "一个追剧神器 anime streaming"},
         {**_item("org/random-thing", 5000), "description": "storage manager for blobs"},
     ])
-    collector = Collector(_single_cfg(), db, client)
+    cfg = _single_cfg()
+    cfg.categories = {"影视": ["追剧"]}
+    collector = Collector(cfg, db, client)
     summary = collector.collect_once(source="discovery", discovery_only=True)
     collector.wait_backfill()
 
@@ -788,3 +791,45 @@ def test_discovery_word_boundary_no_false_match(tmp_path):
     assert db.project_exists("org/storage-mgr") is None
     row = db.project_exists("org/ai-agent-x")
     assert row is not None and row["category"] == "AI工具"
+
+
+def test_build_category_queries_quotes_english_phrases():
+    """英文多词关键词必须短语化：不加引号会被 GitHub 拆成裸词 OR
+    （"game framework" → game OR framework），framework 裸词曾把非游戏框架整批捞错类。"""
+    from app.collector import build_category_queries
+    q = build_category_queries(["追剧", "game engine", "anime"], 200, "2026-07-26")
+    assert len(q) == 1
+    assert '"追剧"' in q[0]
+    assert '"game engine"' in q[0]      # 多词短语带引号
+    assert " anime " in f" {q[0]} "     # 单词不加引号（GitHub 自带词干）
+
+
+def test_english_word_pattern_variants_and_codes():
+    """本地匹配：词形变体（agents↔agent）、域代码子串（tvbox→TVBoxOSC）、
+    短词防误配（rag 不得命中 storage）。"""
+    from app.collector import _english_word_pattern
+    assert _english_word_pattern("agent").search("multi agents framework")
+    assert _english_word_pattern("streaming").search("video streaming")
+    assert _english_word_pattern("tvbox").search("tvboxosc")
+    assert _english_word_pattern("m3u8").search("n_m3u8dl-re")
+    assert not _english_word_pattern("rag").search("object storage backend")
+    assert not _english_word_pattern("rag").search("with large rags")   # 短词不开复数变体
+    assert not _english_word_pattern("ai").search("maintain available")
+
+
+def test_full_sweep_recheck_drops_nonmatching(tmp_path):
+    """全量扫荡本地复检：GitHub 词干/分词误伤（streamed≠流媒体）的候选不得入库。"""
+    db = Database(tmp_path / "test.db")
+    cfg = _single_cfg()
+    cfg.categories = {"影视": ["追剧"]}
+    client = FakeClient([
+        {**_item("org/real-movie", 5000), "description": "追剧神器 在线影视聚合"},
+        {**_item("org/moe-engine", 43645), "description": "Run MoE models, experts streamed from disk"},
+    ])
+    collector = Collector(cfg, db, client)
+    summary = collector.collect_once()
+    collector.wait_backfill()
+    assert summary["status"] == "success"
+    assert summary["stats"]["inserted"] == 1
+    assert db.project_exists("org/real-movie") is not None
+    assert db.project_exists("org/moe-engine") is None  # 词干误伤被复检拦截

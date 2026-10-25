@@ -48,12 +48,13 @@ categories:
     - 在线影视
     - TVBox
     - IPTV
-    - m3u
+    - m3u8
     - 聚合搜索
     - 弹幕播放器
     - 影视资源
-    - streaming
+    - video streaming   # 短语匹配；裸词 streaming 会被 GitHub 词干匹配到 "streamed from disk" 的 ML 项目
     - vod
+    - media player
   视频工具:
     - 视频下载
     - 视频解析
@@ -88,6 +89,8 @@ categories:
     - 游戏框架
     - game framework
   开发:
+    - interview
+    - courses
     - 开发者工具
     - developer tools
     - cli
@@ -113,6 +116,11 @@ categories:
     - programming
     - 开发资料
     - 数据库
+    - framework      # 开发框架类（bootstrap/fastapi 等）归开发；此前 "game framework" 被拆成裸词 framework 污染游戏开发
+    - runtime
+    - sdk
+    - compiler
+    - awesome
   AI工具:
     - AI 绘画
     - AI 编程助手
@@ -133,6 +141,11 @@ categories:
     - AI workflow
     - 智能体
     - AI 助手
+    - ai
+    - claude
+    - gpt
+    - openai
+    - chatgpt
   效率工具:
     - 笔记
     - 剪贴板
@@ -153,6 +166,8 @@ categories:
     - productivity
     - 搜索工具
     - 邮件客户端
+    - remote desktop
+    - automation
   加速工具:
     - 游戏加速
     - 变速器
@@ -187,6 +202,7 @@ categories:
     - 配色
     - 设计稿
   创作:
+    - presentation
     - 图片编辑
     - photo editor
     - 图像处理
