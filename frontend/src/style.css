@@ -412,17 +412,7 @@ a:hover {
   color: var(--on-accent);
 }
 
-/* 中文友好筛选：语义色与「新增」一致（ok 绿） */
-.zh-chip {
-  color: var(--ok);
-  border-color: var(--ok);
-}
-
-.zh-chip.active {
-  background: var(--ok);
-  border-color: var(--ok);
-  color: var(--on-accent);
-}
+/* 中文友好筛选：由语言组「中文」承担（zh=1 口径），无独立 chip */
 
 /* 分类 chip 的项目计数：暗色小数字，不与分类名抢焦点 */
 .chip-count {

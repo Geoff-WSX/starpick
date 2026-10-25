@@ -215,8 +215,16 @@ function selectCategory(c: string) {
   applyQuery()
 }
 
+// 「中文」走中文友好口径（zh=1，比简介语言判定更全）；「英文」仍按简介语言。组内单选。
 function selectLang(l: string) {
-  lang.value = l
+  if (l === 'zh') {
+    const on = onlyZh.value === '1'
+    onlyZh.value = on ? '' : '1'
+    lang.value = ''
+  } else {
+    lang.value = l
+    onlyZh.value = ''   // 单选：切到其它语言时取消中文
+  }
   page.value = 1
   applyQuery()
 }
@@ -224,12 +232,6 @@ function selectLang(l: string) {
 // 「新增」独立条件：与分类/语言互不干扰，点击开关
 function selectNew() {
   onlyNew.value = onlyNew.value ? '' : 'new'
-  page.value = 1
-  applyQuery()
-}
-
-function selectZh() {
-  onlyZh.value = onlyZh.value ? '' : '1'
   page.value = 1
   applyQuery()
 }
@@ -386,7 +388,8 @@ onUnmounted(() => {
           v-for="l in LANGS"
           :key="l.value"
           class="chip lang-chip"
-          :class="{ active: lang === l.value }"
+          :class="{ active: l.value === 'zh' ? onlyZh === '1' : lang === l.value }"
+          :title="l.value === 'zh' ? '中文友好项目：简介为中文，或对中文用户友好（含中文文档/界面）' : undefined"
           @click="selectLang(l.value)"
         >
           {{ l.label }}
@@ -396,12 +399,6 @@ onUnmounted(() => {
         <span class="filter-label">新增</span>
         <button class="chip new-chip" :class="{ active: onlyNew === 'new' }" @click="selectNew">
           新增
-        </button>
-      </div>
-      <div class="filter-group">
-        <span class="filter-label">友好</span>
-        <button class="chip zh-chip" :class="{ active: onlyZh === '1' }" @click="selectZh">
-          中文友好
         </button>
       </div>
     </div>
