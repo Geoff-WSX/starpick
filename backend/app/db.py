@@ -669,6 +669,13 @@ class Database:
                 )
             return counts
 
+    def category_counts(self, names: list[str]) -> dict[str, int]:
+        """每分类的项目总数（含收藏、含附加分类命中）——首页筛选 chip 计数用。"""
+        if not names:
+            return {}
+        with self._lock:
+            return {name: len(self._category_hit_rows([name])) for name in names}
+
     def delete_projects_by_categories(self, names: list[str]) -> dict:
         """删除命中分类的项目（主分类或附加分类任一命中），事务执行全删或全不删。
 
@@ -909,10 +916,13 @@ class Database:
 
     def search_projects(self, category: str | None = None, keyword: str = "",
                         lang: str = "", page: int = 1, page_size: int = 20,
-                        sort: str = "stars", new_since: str = "") -> tuple[list[sqlite3.Row], int]:
+                        sort: str = "stars", new_since: str = "",
+                        zh_friendly_only: bool = False) -> tuple[list[sqlite3.Row], int]:
         """按分类/语言/关键词查询，返回 (行列表, 总数)。keyword 对 name/description 做 LIKE 匹配。
 
         new_since 非空时仅返回该时间之后首次入库的项目（新增高亮筛选）。
+        zh_friendly_only 只保留「中文友好」标记的项目（首页筛选用）。
+        sort：stars=Star 数 / recent=最近活跃（pushed_at）/ new=最近入库（first_seen_at）。
         """
         clauses, params = [], []
         if category:
@@ -922,6 +932,8 @@ class Database:
         if lang in ("zh", "en"):
             clauses.append("lang=?")
             params.append(lang)
+        if zh_friendly_only:
+            clauses.append("zh_friendly=1")
         if keyword:
             like = f"%{self._escape_like(keyword)}%"
             clauses.append("(name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')")
@@ -934,7 +946,11 @@ class Database:
             total = self._conn.execute(
                 f"SELECT COUNT(*) FROM projects {where}", params
             ).fetchone()[0]
-            order = "stars DESC" if sort == "stars" else "pushed_at DESC"
+            order = {
+                "stars": "stars DESC",
+                "recent": "pushed_at DESC",
+                "new": "first_seen_at DESC, stars DESC",
+            }.get(sort, "stars DESC")
             offset = (page - 1) * page_size
             rows = self._conn.execute(
                 f"SELECT {_LIST_COLS} FROM projects {where} ORDER BY {order} LIMIT ? OFFSET ?",

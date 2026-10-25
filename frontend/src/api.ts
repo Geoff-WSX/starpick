@@ -150,6 +150,8 @@ export async function fetchProjects(params: {
   keyword?: string
   lang?: string
   new?: string
+  /** 只看「中文友好」标记的项目 */
+  zh?: string
   page: number
   page_size: number
   sort: string
@@ -159,6 +161,7 @@ export async function fetchProjects(params: {
   if (params.keyword) q.set('keyword', params.keyword)
   if (params.lang) q.set('lang', params.lang)
   if (params.new) q.set('new', params.new)
+  if (params.zh) q.set('zh', params.zh)
   q.set('page', String(params.page))
   q.set('page_size', String(params.page_size))
   q.set('sort', params.sort)
@@ -216,7 +219,7 @@ export function fetchCollectParams(): Promise<CollectParams> {
   return getJson('/api/collect/params')
 }
 
-export function fetchCategories(): Promise<{ categories: string[] }> {
+export function fetchCategories(): Promise<{ categories: string[]; counts?: Record<string, number> }> {
   return getJson('/api/categories')
 }
 

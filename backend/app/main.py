@@ -512,8 +512,9 @@ def list_projects(
     lang: str = Query(default="", pattern="^(|zh|en)$"),
     page: int = Query(default=1, ge=1, le=1000),
     page_size: int = Query(default=20, ge=1, le=100),
-    sort: str = Query(default="stars", pattern="^(stars|recent)$"),
+    sort: str = Query(default="stars", pattern="^(stars|recent|new)$"),
     new: str = Query(default="", pattern="^(|new)$"),
+    zh: str = Query(default="", pattern="^(|1)$"),
 ) -> dict[str, Any]:
     # 新增角标/筛选共用口径：最近 NEW_WINDOW_HOURS 小时内首次入库的项目（不随空轮重置）。
     # 角标必须在普通列表也生效（new_since 非空即标记 is_new），否则 NEW 只在筛选后才可见；
@@ -523,7 +524,8 @@ def list_projects(
     ).strftime("%Y-%m-%d %H:%M:%S")
     filter_since = badge_since if new == "new" else ""
     rows, total = state.db.search_projects(
-        category, keyword.strip(), lang, page, page_size, sort, filter_since
+        category, keyword.strip(), lang, page, page_size, sort, filter_since,
+        zh_friendly_only=(zh == "1"),
     )
     items = [_project_out(r, new_since=badge_since) for r in rows]
     return {
@@ -729,8 +731,10 @@ def collect_params() -> dict[str, Any]:
 
 @app.get("/api/categories", response_model=dict[str, Any])
 def categories() -> dict[str, Any]:
-    """全部分类（内置 + 自定义），供首页筛选与采集中心分类选择。"""
-    return {"categories": _all_categories()}
+    """全部分类（内置 + 自定义）与各分类项目总数，供首页筛选与采集中心分类选择。"""
+    names = _all_categories()
+    counts = state.db.category_counts(names) if state.db is not None else {}
+    return {"categories": names, "counts": counts}
 
 
 def _all_categories() -> list[str]:

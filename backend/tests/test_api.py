@@ -102,6 +102,23 @@ def test_list_projects(client):
     assert zh_item["assets_probed"] is False
 
 
+def test_list_projects_zh_filter_and_sorts(client):
+    """zh=1 只留中文友好；sort=new 按 first_seen_at 倒序（契约：合法排序值 200）。"""
+    resp = client.get("/api/projects?zh=1")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 1
+    assert body["items"][0]["full_name"] == "org/app-zh"
+    assert body["items"][0]["zh_friendly"] is True
+
+    for sort_value in ("stars", "recent", "new"):
+        r = client.get(f"/api/projects?sort={sort_value}")
+        assert r.status_code == 200
+        assert len(r.json()["items"]) == 2
+    # 非法排序值被 422 拦截
+    assert client.get("/api/projects?sort=bogus").status_code == 422
+
+
 def test_list_projects_filter_by_category(client):
     resp = client.get("/api/projects", params={"category": "影视"})
     assert resp.json()["total"] == 2

@@ -25,6 +25,7 @@ const category = ref(typeof q.category === 'string' ? q.category : '')
 const keyword = ref(typeof q.keyword === 'string' ? q.keyword : '')
 const lang = ref(typeof q.lang === 'string' ? q.lang : '')
 const onlyNew = ref(typeof q.new === 'string' ? q.new : '')
+const onlyZh = ref(typeof q.zh === 'string' ? q.zh : '')
 const sort = ref(typeof q.sort === 'string' ? q.sort : 'stars')
 const page = ref(parseInt(typeof q.page === 'string' ? q.page : '1', 10) || 1)
 const loading = ref(false)
@@ -32,11 +33,14 @@ const loadingMore = ref(false)
 const error = ref('')
 
 // 分类列表：内置分类 + 自定义分类（自定义分类采集后自动出现在首页筛选）
+// chip 上附带各分类项目数（'全部' 显示总数，加载后填充）
 const CATEGORIES = ref<string[]>(['', '影视', '视频工具', '游戏', '游戏开发', '开发', 'AI工具', '效率工具', '加速工具', '设计', '创作', '音乐', '阅读'])
+const categoryCounts = ref<Record<string, number>>({})
 fetchCategories()
   .then((r) => {
     const list = r.categories ?? []
     CATEGORIES.value = ['', ...list]
+    categoryCounts.value = r.counts ?? {}
   })
   .catch(() => { /* 后端暂不可用：保留内置兜底 */ })
 const LANGS = [
@@ -56,9 +60,20 @@ function applyQuery() {
   if (keyword.value.trim()) query.keyword = keyword.value.trim()
   if (lang.value) query.lang = lang.value
   if (onlyNew.value) query.new = onlyNew.value
+  if (onlyZh.value) query.zh = onlyZh.value
   if (sort.value !== 'stars') query.sort = sort.value
   if (page.value > 1) query.page = String(page.value)
   router.replace({ query })
+}
+
+/** 是否有任一筛选生效（空态文案与「清除筛选」按钮用） */
+function hasActiveFilters() {
+  return Boolean(category.value || keyword.value.trim() || lang.value || onlyNew.value || onlyZh.value)
+}
+
+/** 一键清除全部筛选回全部列表 */
+function clearFilters() {
+  router.replace({ query: {} })
 }
 
 // ---- 数据加载：append=true 追加下一页（触底），false 替换（筛选/搜索/翻页/URL 变化） ----
@@ -72,6 +87,7 @@ async function loadProjects(append = false) {
       keyword: keyword.value.trim() || undefined,
       lang: lang.value || undefined,
       new: onlyNew.value || undefined,
+      zh: onlyZh.value || undefined,
       page: page.value,
       page_size: pageSize,
       sort: sort.value,
@@ -96,7 +112,7 @@ async function loadProjects(append = false) {
 function saveSnapshot(pageOverride?: number) {
   try {
     const snapshot: Record<string, string> = {}
-    for (const key of ['category', 'keyword', 'lang', 'new', 'sort']) {
+    for (const key of ['category', 'keyword', 'lang', 'new', 'zh', 'sort']) {
       const v = route.query[key]
       if (typeof v === 'string' && v) snapshot[key] = v
     }
@@ -110,11 +126,12 @@ watch(
   () => route.query,
   () => {
     const q2 = route.query
-    category.value = typeof q2.category === 'string' ? q2.category : ''
-    keyword.value = typeof q2.keyword === 'string' ? q2.keyword : ''
-    lang.value = typeof q2.lang === 'string' ? q2.lang : ''
-    onlyNew.value = typeof q2.new === 'string' ? q2.new : ''
-    sort.value = typeof q2.sort === 'string' ? q2.sort : 'stars'
+        category.value = typeof q2.category === 'string' ? q2.category : ''
+        keyword.value = typeof q2.keyword === 'string' ? q2.keyword : ''
+        lang.value = typeof q2.lang === 'string' ? q2.lang : ''
+        onlyNew.value = typeof q2.new === 'string' ? q2.new : ''
+        onlyZh.value = typeof q2.zh === 'string' ? q2.zh : ''
+        sort.value = typeof q2.sort === 'string' ? q2.sort : 'stars'
     page.value = parseInt(typeof q2.page === 'string' ? q2.page : '1', 10) || 1
     // 同步会话记忆：任何 URL 变化都记录，详情页返回可恢复（含直接改地址/刷新场景）
     saveSnapshot()
@@ -146,10 +163,11 @@ function loadMore() {
 // 处于翻页深处/带筛选时不打扰（重拉会跳页、且筛选集合可能没命中新项目）。
 async function silentReload() {
   if (loading.value || loadingMore.value) return
-  if (page.value !== 1 || category.value || keyword.value.trim() || onlyNew.value) return
+  if (page.value !== 1 || category.value || keyword.value.trim() || onlyNew.value || onlyZh.value) return
   try {
     const data = await fetchProjects({
       lang: lang.value || undefined,
+      zh: onlyZh.value || undefined,
       page: 1,
       page_size: pageSize,
       sort: sort.value,
@@ -210,10 +228,17 @@ function selectNew() {
   applyQuery()
 }
 
+function selectZh() {
+  onlyZh.value = onlyZh.value ? '' : '1'
+  page.value = 1
+  applyQuery()
+}
+
 // ---- 排序下拉：自绘组件（原生 select 弹出 UI 不可控） ----
 const SORT_OPTIONS = [
   { value: 'stars', label: 'Star 最多' },
   { value: 'recent', label: '最近活跃' },
+  { value: 'new', label: '最近入库' },
 ]
 const sortOpen = ref(false)
 const sortLabel = computed(() => SORT_OPTIONS.find((o) => o.value === sort.value)?.label ?? 'Star 最多')
@@ -352,7 +377,7 @@ onUnmounted(() => {
           :class="{ active: category === c }"
           @click="selectCategory(c)"
         >
-          {{ c || '全部' }}
+          {{ c || '全部' }}<span class="chip-count">{{ c ? (categoryCounts[c] ?? '') : total }}</span>
         </button>
       </div>
       <div class="filter-group">
@@ -371,6 +396,12 @@ onUnmounted(() => {
         <span class="filter-label">新增</span>
         <button class="chip new-chip" :class="{ active: onlyNew === 'new' }" @click="selectNew">
           新增
+        </button>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">友好</span>
+        <button class="chip zh-chip" :class="{ active: onlyZh === '1' }" @click="selectZh">
+          中文友好
         </button>
       </div>
     </div>
@@ -408,7 +439,11 @@ onUnmounted(() => {
     <!-- 列表 -->
     <div v-if="loading" class="empty">加载中…</div>
     <div v-else-if="projects.length === 0" class="empty">
-      <template v-if="onlyNew === 'new'">近 72 小时暂无新增项目。可前往「采集中心」触发一轮搜索。</template>
+      <template v-if="hasActiveFilters()">
+        没有匹配的项目——换个关键词或筛选条件试试，
+        <button class="link-btn" @click="clearFilters">查看全部</button>
+      </template>
+      <template v-else-if="onlyNew === 'new'">近 72 小时暂无新增项目。可前往「采集中心」触发一轮搜索。</template>
       <template v-else>暂无项目。可前往「采集中心」手动触发一轮搜索。</template>
     </div>
     <div v-else class="grid">

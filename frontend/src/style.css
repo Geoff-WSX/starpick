@@ -412,6 +412,48 @@ a:hover {
   color: var(--on-accent);
 }
 
+/* 中文友好筛选：语义色与「新增」一致（ok 绿） */
+.zh-chip {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.zh-chip.active {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: var(--on-accent);
+}
+
+/* 分类 chip 的项目计数：暗色小数字，不与分类名抢焦点 */
+.chip-count {
+  margin-left: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.chip.active .chip-count {
+  color: inherit;
+  opacity: 0.75;
+}
+
+/* 空态里的行内操作按钮（清除筛选） */
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  font-size: inherit;
+}
+
+.link-btn:hover {
+  color: var(--accent-deep);
+}
+
 /* 卡片语言标签：中文墨绿 / 英文钢蓝（浅底） */
 .tag.lang-zh {
   color: var(--ok);
