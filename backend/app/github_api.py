@@ -191,9 +191,10 @@ class GitHubClient:
         if self._token:
             self.session.headers.update({"Authorization": f"Bearer {self._token}"})
         # README 多通道并行探测 + 采集并发时，默认连接池（10）会溢出并反复丢弃连接，
-        # 调大池容量减少重建开销（日志曾出现 Connection pool is full 告警）
+        # 调大池容量减少重建开销（64 仍会在回填+变体探测同时高峰时打满刷
+        # "Connection pool is full" 告警，实测 128 后安静）
         adapter = requests.adapters.HTTPAdapter(
-            pool_connections=64, pool_maxsize=64, max_retries=0
+            pool_connections=128, pool_maxsize=128, max_retries=0
         )
         self.session.mount("https://", adapter)
         # 搜索与 core 请求分开限流；core 速率按 小时配额折算为分钟

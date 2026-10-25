@@ -347,17 +347,6 @@ class Database:
             ).fetchone()
             return row
 
-    def last_round_by_sources(self, sources: tuple[str, ...]) -> sqlite3.Row | None:
-        """按来源集合查最近一轮（启动补跑判定用：区分发现轮与全量轮）。"""
-        if not sources:
-            return None
-        marks = ",".join("?" * len(sources))
-        with self._lock:
-            return self._conn.execute(
-                f"SELECT * FROM rounds WHERE source IN ({marks}) ORDER BY id DESC LIMIT 1",
-                list(sources),
-            ).fetchone()
-
     def list_rounds(self, limit: int = 100) -> list[sqlite3.Row]:
         with self._lock:
             return self._conn.execute(
