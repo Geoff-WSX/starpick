@@ -26,6 +26,7 @@ const keyword = ref(typeof q.keyword === 'string' ? q.keyword : '')
 const lang = ref(typeof q.lang === 'string' ? q.lang : '')
 const onlyNew = ref(typeof q.new === 'string' ? q.new : '')
 const onlyZh = ref(typeof q.zh === 'string' ? q.zh : '')
+const platform = ref(typeof q.platform === 'string' ? q.platform : '')
 const sort = ref(typeof q.sort === 'string' ? q.sort : 'stars')
 const page = ref(parseInt(typeof q.page === 'string' ? q.page : '1', 10) || 1)
 const loading = ref(false)
@@ -48,6 +49,8 @@ const LANGS = [
   { value: 'zh', label: '中文' },
   { value: 'en', label: '英文' },
 ]
+// 平台筛选：值与入库的 platforms JSON 数组取值一致（requirements 推断），与分类平级的独立维度
+const PLATFORMS = ['Windows', 'macOS', 'Linux', 'Android', 'iOS', 'Web', 'Docker']
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 
 // 最近一次列表查询条件（详情页返回时恢复）
@@ -61,6 +64,7 @@ function applyQuery() {
   if (lang.value) query.lang = lang.value
   if (onlyNew.value) query.new = onlyNew.value
   if (onlyZh.value) query.zh = onlyZh.value
+  if (platform.value) query.platform = platform.value
   if (sort.value !== 'stars') query.sort = sort.value
   if (page.value > 1) query.page = String(page.value)
   router.replace({ query })
@@ -68,7 +72,7 @@ function applyQuery() {
 
 /** 是否有任一筛选生效（空态文案与「清除筛选」按钮用） */
 function hasActiveFilters() {
-  return Boolean(category.value || keyword.value.trim() || lang.value || onlyNew.value || onlyZh.value)
+  return Boolean(category.value || keyword.value.trim() || lang.value || onlyNew.value || onlyZh.value || platform.value)
 }
 
 /** 一键清除全部筛选回全部列表 */
@@ -88,6 +92,7 @@ async function loadProjects(append = false) {
       lang: lang.value || undefined,
       new: onlyNew.value || undefined,
       zh: onlyZh.value || undefined,
+      platform: platform.value || undefined,
       page: page.value,
       page_size: pageSize,
       sort: sort.value,
@@ -112,7 +117,7 @@ async function loadProjects(append = false) {
 function saveSnapshot(pageOverride?: number) {
   try {
     const snapshot: Record<string, string> = {}
-    for (const key of ['category', 'keyword', 'lang', 'new', 'zh', 'sort']) {
+    for (const key of ['category', 'keyword', 'lang', 'new', 'zh', 'platform', 'sort']) {
       const v = route.query[key]
       if (typeof v === 'string' && v) snapshot[key] = v
     }
@@ -131,6 +136,7 @@ watch(
         lang.value = typeof q2.lang === 'string' ? q2.lang : ''
         onlyNew.value = typeof q2.new === 'string' ? q2.new : ''
         onlyZh.value = typeof q2.zh === 'string' ? q2.zh : ''
+        platform.value = typeof q2.platform === 'string' ? q2.platform : ''
         sort.value = typeof q2.sort === 'string' ? q2.sort : 'stars'
     page.value = parseInt(typeof q2.page === 'string' ? q2.page : '1', 10) || 1
     // 同步会话记忆：任何 URL 变化都记录，详情页返回可恢复（含直接改地址/刷新场景）
@@ -163,11 +169,12 @@ function loadMore() {
 // 处于翻页深处/带筛选时不打扰（重拉会跳页、且筛选集合可能没命中新项目）。
 async function silentReload() {
   if (loading.value || loadingMore.value) return
-  if (page.value !== 1 || category.value || keyword.value.trim() || onlyNew.value || onlyZh.value) return
+  if (page.value !== 1 || category.value || keyword.value.trim() || onlyNew.value || onlyZh.value || platform.value) return
   try {
     const data = await fetchProjects({
       lang: lang.value || undefined,
       zh: onlyZh.value || undefined,
+      platform: platform.value || undefined,
       page: 1,
       page_size: pageSize,
       sort: sort.value,
@@ -239,6 +246,12 @@ function selectLang(l: string) {
 // 「新增」独立条件：与分类/语言互不干扰，点击开关
 function selectNew() {
   onlyNew.value = onlyNew.value ? '' : 'new'
+  page.value = 1
+  applyQuery()
+}
+
+function selectPlatform(p: string) {
+  platform.value = platform.value === p ? '' : p   // 点同一个平台 = 取消
   page.value = 1
   applyQuery()
 }
@@ -406,6 +419,18 @@ onUnmounted(() => {
         <span class="filter-label">新增</span>
         <button class="chip new-chip" :class="{ active: onlyNew === 'new' }" @click="selectNew">
           新增
+        </button>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">平台</span>
+        <button
+          v-for="p in PLATFORMS"
+          :key="p"
+          class="chip platform-chip"
+          :class="{ active: platform === p }"
+          @click="selectPlatform(p)"
+        >
+          {{ p }}
         </button>
       </div>
     </div>

@@ -414,6 +414,13 @@ a:hover {
 
 /* 中文友好筛选：由语言组「中文」承担（zh=1 口径），无独立 chip */
 
+/* 平台筛选：钢蓝语义（与「英文」标签一致） */
+.platform-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
 /* 分类 chip 的项目计数：暗色小数字，不与分类名抢焦点 */
 .chip-count {
   margin-left: 5px;

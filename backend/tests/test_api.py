@@ -119,6 +119,20 @@ def test_list_projects_zh_filter_and_sorts(client):
     assert client.get("/api/projects?sort=bogus").status_code == 422
 
 
+def test_list_projects_platform_filter(client):
+    """platform 过滤：带引号精确匹配平台名（Web 不得误配 Windows）。"""
+    resp = client.get("/api/projects?platform=Windows")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 1
+    assert body["items"][0]["full_name"] == "org/app-a"
+    assert "Windows" in body["items"][0]["platforms"]
+
+    # Web 只有完整平台名命中：app-a 平台是 [Windows, Android]，不含 Web
+    resp = client.get("/api/projects?platform=Web")
+    assert resp.json()["total"] == 0
+
+
 def test_list_projects_filter_by_category(client):
     resp = client.get("/api/projects", params={"category": "影视"})
     assert resp.json()["total"] == 2

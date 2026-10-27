@@ -152,6 +152,8 @@ export async function fetchProjects(params: {
   new?: string
   /** 只看「中文友好」标记的项目 */
   zh?: string
+  /** 按平台过滤（Windows/macOS/Linux/Android/iOS/Web/Docker） */
+  platform?: string
   page: number
   page_size: number
   sort: string
@@ -162,6 +164,7 @@ export async function fetchProjects(params: {
   if (params.lang) q.set('lang', params.lang)
   if (params.new) q.set('new', params.new)
   if (params.zh) q.set('zh', params.zh)
+  if (params.platform) q.set('platform', params.platform)
   q.set('page', String(params.page))
   q.set('page_size', String(params.page_size))
   q.set('sort', params.sort)

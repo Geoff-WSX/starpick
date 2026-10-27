@@ -917,11 +917,13 @@ class Database:
     def search_projects(self, category: str | None = None, keyword: str = "",
                         lang: str = "", page: int = 1, page_size: int = 20,
                         sort: str = "stars", new_since: str = "",
-                        zh_friendly_only: bool = False) -> tuple[list[sqlite3.Row], int]:
+                        zh_friendly_only: bool = False,
+                        platform: str = "") -> tuple[list[sqlite3.Row], int]:
         """按分类/语言/关键词查询，返回 (行列表, 总数)。keyword 对 name/description 做 LIKE 匹配。
 
         new_since 非空时仅返回该时间之后首次入库的项目（新增高亮筛选）。
         zh_friendly_only 只保留「中文友好」标记的项目（首页筛选用）。
+        platform 非空时按平台过滤（platforms JSON 数组包含该平台，如 Windows/macOS/Android）。
         sort：stars=Star 数 / recent=最近活跃（pushed_at）/ new=最近入库（first_seen_at）。
         """
         clauses, params = [], []
@@ -934,6 +936,10 @@ class Database:
             params.append(lang)
         if zh_friendly_only:
             clauses.append("zh_friendly=1")
+        if platform:
+            # platforms 是 JSON 数组字符串，带引号精确匹配平台名（Web 是 Windows 的子串，不能裸 LIKE）
+            clauses.append("platforms LIKE ? ESCAPE '\\'")
+            params.append(f'%"{self._escape_like(platform)}"%')
         if keyword:
             like = f"%{self._escape_like(keyword)}%"
             clauses.append("(name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')")

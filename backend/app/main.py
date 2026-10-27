@@ -515,6 +515,7 @@ def list_projects(
     sort: str = Query(default="stars", pattern="^(stars|recent|new)$"),
     new: str = Query(default="", pattern="^(|new)$"),
     zh: str = Query(default="", pattern="^(|1)$"),
+    platform: str = Query(default="", max_length=20),
 ) -> dict[str, Any]:
     # 新增角标/筛选共用口径：最近 NEW_WINDOW_HOURS 小时内首次入库的项目（不随空轮重置）。
     # 角标必须在普通列表也生效（new_since 非空即标记 is_new），否则 NEW 只在筛选后才可见；
@@ -525,7 +526,7 @@ def list_projects(
     filter_since = badge_since if new == "new" else ""
     rows, total = state.db.search_projects(
         category, keyword.strip(), lang, page, page_size, sort, filter_since,
-        zh_friendly_only=(zh == "1"),
+        zh_friendly_only=(zh == "1"), platform=platform,
     )
     items = [_project_out(r, new_since=badge_since) for r in rows]
     return {
