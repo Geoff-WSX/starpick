@@ -45,6 +45,7 @@ const categoryColor = computed(() => {
     创作: '#f43f5e',
     音乐: '#2dd4bf',
     阅读: '#22d3ee',
+    系统: '#94a3b8',
   }
   return map[props.project.category] ?? '#9aa2b1'
 })
