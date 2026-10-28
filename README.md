@@ -59,7 +59,7 @@ README、图片、下载直链自动走国内镜像加速（gh-proxy.com / ghpro
 
 手动启动：`backend` 装依赖 → `frontend` 构建 → `python -m uvicorn app.main:app`，访问 http://127.0.0.1:8000。
 
-> 本仓库为 macOS 分支（Windows 分支使用 `start.bat`，两份独立演进，见 FORK.md）。
+> 本仓库为 macOS 分支（与 Windows 旧电脑上的分支独立演进，基线见 FORK.md）。
 
 ## 配置
 
