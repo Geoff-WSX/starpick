@@ -14,7 +14,7 @@ GitHub 公开项目手动发现与下载引导工具：用户在采集中心手�
 # 一键启动（自动建 backend/.venv、装依赖、构建前端、开浏览器）
 ./start.sh                      # 服务地址 http://127.0.0.1:8000，停止用 pkill -f 'uvicorn app.main:app'
 
-# 后端测试（175 项，2026-10-23 实测全绿；必须用 venv 里的 python）
+# 后端测试（180 项，2026-10-28 实测全绿；必须用 venv 里的 python）
 cd backend && .venv/bin/python -m pytest tests -q
 cd backend && .venv/bin/python -m pytest tests/test_collector.py -q   # 单文件更快迭代
 
@@ -32,7 +32,7 @@ cd frontend && npm run dev      # http://localhost:5173
 
 ## Git 与远端
 
-- 仓库 `https://github.com/Geoff-WSX/starpick`（分支 `main`，已公开）。**2026-10-24 版本重置：v1.0.0~v1.3.0 均为测试版，其 Release（含资产）与 tag 已全部删除，正式版从 v1.0 起步**；tag 触发 Windows CI 自动产 setup.exe 上 Release，macOS dmg 手动补传。Windows 分支不在同一仓库（见 FORK.md），不要往这个仓库里塞 Windows 专有内容。
+- 仓库 `https://github.com/Geoff-WSX/starpick`（分支 `main`，已公开）。**2026-10-24 版本重置：v1.0.0~v1.3.0 均为测试版，其 Release（含资产）与 tag 已全部删除，正式版从 v1.0 起步；v1.1（2026-10-28）已发布，当前 Latest=v1.1**；tag 触发 Windows CI 自动产 setup.exe 上 Release，macOS dmg 手动补传。Windows 分支不在同一仓库（见 FORK.md），不要往这个仓库里塞 Windows 专有内容（start.bat 已删）。
 - **直连 `github.com` 会被墙，但 `api.github.com` 可以直连**——现象是 `gh` 建库/查 API 一切正常、`git push` 却超时（或报 HTTP2 framing error）。本仓库 `.git/config` 已写死 `http.proxy=http://127.0.0.1:7890` 与 `http.version=HTTP/1.1`，推送/拉取前确认本机代理在运行；凭据走 `credential.helper='!gh auth git-credential'`（Token 从 gh 钥匙串取，不落盘，不要改成把 Token 写进 URL）。
 - 永不提交：`history.db*`、`backend/data/`（备份目录）、`logs/`、`*.log*`、`.runtime_token`、`frontend/dist/`、`node_modules/`、`.venv/`、`*.tsbuildinfo`、编译产物 `frontend/vite.config.js` 与其 `.d.ts`。推前自查：`git ls-files | grep -Ei '\.env$|runtime_token|\.db|node_modules|dist/|\.log'` 应无输出。
 
@@ -50,14 +50,17 @@ backend/
 │   ├── github_api.py    # GitHub 客户端：限流令牌队列/分级重试/镜像 failover
 │   ├── collector.py     # 采集流水线：防重入/去重/并发抓取/进度快照
 │   ├── requirements.py  # 平台推断/系统要求提取/中文检测
+│   ├── desktop.py       # 桌面壳：pywebview 窗口 + 程序化 uvicorn
+│   ├── paths.py         # 数据/资源路径层（冻结/开发双模式）
 │   └── picker.py        # 每日精选
-└── tests/               # pytest 单元/契约测试
+└── tests/               # pytest 单元/契约测试（180 项）
 frontend/src/
 ├── views/               # ProjectList（榜单+采集中心入口）、ProjectDetail（详情）
 ├── components/          # AppHeader/BaseSelect/CollectModal/CategoryCleanupModal/DownloadPicker/FavoritesModal/RoundsModal/SettingsModal/UpdatesModal/ProjectCard
 ├── composables/         # 组合式复用逻辑
 ├── api.ts               # 所有后端调用集中在此
 └── router.ts
+packaging/               # 桌面打包：spec/双平台构建脚本/Inno 配置
 ```
 
 ## 前端样式约定
@@ -80,10 +83,16 @@ frontend/src/
 ## 列表自动刷新与安装包检测进度（2026-10-24 落地）
 
 - 采集落库/安装包探测回填后列表 30s 内自动更新：`AppHeader` 的既有轮询附带 `GET /api/stats`，**三个信号任一变化**即 `window.dispatchEvent('starpick:projects-changed')` → `ProjectList.silentReload()` 静默重拉：`total_projects`（采集增删）、`assets_ready`（探测出安装包）、`assets_pending`（探测结论为「确无 release」——前两者都不动，只有它减一，漏了它卡片「检测中」态翻不掉）。
-- **silentReload 的守卫**：仅第一页且无分类/关键词/新增筛选时生效（翻页深处/带筛选不打扰，避免跳页）；无变化判定用签名 `id:assets数:probed位` 逐项拼接比对——**别改成 Set 包含判定**（新项目 star 少排尾页时第一页 id 完全一致但 total 已变，Set 判定会误判"无变化"，实测踩过）。
+- **silentReload 的守卫**：仅第一页且无分类/关键词/新增/平台筛选时生效（翻页深处/带筛选不打扰，避免跳页）；无变化判定用签名 `id:assets数:probed位` 逐项拼接比对——**别改成 Set 包含判定**（新项目 star 少排尾页时第一页 id 完全一致但 total 已变，Set 判定会误判"无变化"，实测踩过）。
 - **安装包三态**：`assets 非空`→「下载版本 · N 个」；`assets 空且 assets_probed`→只有复制提示词；`assets 空且未探测`→「安装包检测中…」标签（`.probe-chip` 样式，点击经 `starpick:open-collect` 事件由 AppHeader 打开采集中心）。`assets_probed` 已进 `_LIST_COLS` 与 `ProjectOut`，详情页主按钮同三态。
 - 顶栏状态行在有未探测项目时显示「安装包检测 已完成/总数」，未配 Token 追加限速提示；全部探测完自动隐藏。
 - 两个事件名 `starpick:projects-changed` / `starpick:open-collect` 是 window 级全局契约，广播端（AppHeader）与监听端要同时改。
+
+## 平台筛选（2026-10-27 落地）
+
+- 筛选区「平台」组：Windows/macOS/Linux/Android/iOS/Web/Docker，与分类平级可叠加，URL 参数 `platform`，再点同平台取消。
+- 后端 `search_projects(platform=...)` 用 **带引号 LIKE `%"Windows"%`** 精确匹配 platforms JSON 数组——裸 LIKE 会让 Web 命中 Windows，测试锁定了该行为。
+- 语言组「中文」是**中文友好口径**（`zh=1`，含简介英文但中文友好的项目，约 430 个），不是简介语言判定；「英文」才是 `lang=en`。组内严格单选（`isLangActive`）。
 
 ## 设置「关于」分组与应用自更新（2026-10-20 落地）
 
@@ -134,6 +143,7 @@ frontend/src/
 - **详情接口响应会随语言数变大**：`/api/projects/{id}` 会带上全部语言正文（supabase 41 种语言约 600 KB 未压缩；列表接口走 `_LIST_COLS` 不返回这些大字段）。改详情接口时别顺手把语言字段塞进列表接口。
 - **浏览器自动化点长详情页会超时**：README 很长时 Playwright 的 `click()` 常超时（即使 `force: true`），改用 `locator.evaluate((el) => el.click())` 派发真实 DOM 点击触发 Vue 事件委托；页面里 `.markdown-body` 有多个（release 说明 + README），README 是最后一个。
 - **会话顶部注入的约束可能来自另一个项目**：`~/AGENTS.md` 写的是「街头美食社交平台」（React + Ant Design + Express + Prisma + MySQL），会被当作 workspace 约束注入到本仓库的会话里。那套规则（如「后端只允许改 backend/src/」）与本仓库布局不符，**一律以本文件为准**。
+- **仓库顶层不该再出现 Windows 专有内容**：start.bat 已于 2026-10-28 删除；立项文档移入 docs/。品牌统一为 **STARPICK/starpick**，旧名「GitHub 好项目发现器」「拾星」已全仓清除，不要再引入。
 
 ## 双机分叉约定（见 FORK.md）
 
@@ -148,8 +158,8 @@ frontend/src/
 - **自检机制（CI 冒烟与打包验收依赖）**：`--selftest` 无窗口起服务→探活→校验静态页→退出。`STARPICK_SELFTEST=1` 会关闭启动补跑采集（空库 + 真 token 的组合绝不能发真实网络请求）；`STARPICK_SELFTEST_REPORT=<path>` 把输出写文件（Windows `console=False` 的 exe 在 CI 里 stdout 是 NUL，不写文件什么都看不到）；`STARPICK_SELFTEST_WEBVIEW=1` 额外校验 GUI 栈可导入。改 desktop/main/config 三者之一要复跑 `test_desktop.py` + `test_paths.py`。
 - **回环请求绝不走系统代理**：本机探测（/health、自检 GET）必须用 `desktop._urlopen_local()`（`ProxyHandler({})`）——macOS urllib 会读系统代理设置（Clash/表哥云），127.0.0.1 请求被转给代理后桌面壳会误报"启动失败"。WKWebView 自身直连回环，不受影响。
 - **构建入口与产物**：macOS `./packaging/macos/build_macos.sh [版本号]` → `packaging/dist/StarPick.app` + `StarPick-<版本>-arm64.dmg`（本地构建，构建用 `packaging/.venv-build`，勿用 Anaconda base——PyInstaller 不支持）；Windows `packaging/windows/build_windows.ps1` + `installer.iss`（Inno Setup，Per-user 无 UAC）→ CI `.github/workflows/build-windows.yml`（windows-latest 自带 Inno Setup 6，产物 `StarPick-*-setup.exe` + `selftest-report.txt`；tag `v*` 触发自动传 Release；要拿 `selftest-report.txt`/setup.exe 复盘用 `gh run download <run-id>`）。本机 PyInstaller 无法交叉编译 Windows 包，Windows 产物只能 CI 出；**验证 CI 包别解 Inno**——`gh run view --log` 的 `Compressing:` 行就是完整文件清单，版本读 setup.exe 内 UTF-16 版本资源（本机 innoextract 装不上，别再折腾）。
-- **版本号三处同步**：spec `VERSION`、`installer.iss` `MyAppVersion`、`app.main.APP_VERSION`（+ git tag 共四处）；改一处要同步其余（2026-10-23 发过 v1.2.0，流程已完整走通）。桌面壳窗口标题由 `desktop.py _window_title()` 生成（`STARPICK vX.Y.Z`）。
-- **macOS dmg 要手动补传 Release**：CI 只产 Windows setup.exe；macOS 包打完要 `gh release upload vX.Y.Z packaging/dist/StarPick-<版本>-arm64.dmg`（v1.0.0 起一直如此，v1.2.0 也补传过）。用户"从 GitHub 下载安装"的前提是线上资产齐全。
+- **版本号三处同步**：spec `VERSION`、`installer.iss` `MyAppVersion`、`app.main.APP_VERSION`（+ git tag 共四处）；改一处要同步其余（v1.0/v1.1 已两次走通全流程）。桌面壳窗口标题由 `desktop.py _window_title()` 生成（`STARPICK vX.Y.Z`）。
+- **macOS dmg 要手动补传 Release**：CI 只产 Windows setup.exe；macOS 包打完要 `gh release upload vX.Y.Z packaging/dist/StarPick-<版本>-arm64.dmg`（v1.0 起一直如此，v1.1 也补传过）。用户"从 GitHub 下载安装"的前提是线上资产齐全。
 - **卸载/升级保留数据**：Inno `[UninstallDelete]` 特意不删数据目录；v1.0.0→v1.1.0 实测可原地升级。
 
 ## 采集分类匹配契约（2026-10-25 修复后）
@@ -162,8 +172,8 @@ frontend/src/
 
 ## 延伸阅读
 
-- `README.md` — 功能全貌、API 一览、故障排查表（注意：第 15/91 行关于多语言 README 的描述还是「中/英」时代的写法，现状看上面那节）
+- `README.md` — 功能全貌、API 一览、故障排查表（2026-10-28 已重写为「适用人群优先」视角，同步现状）
 - `FORK.md` — 双机分叉基线与约定
 - `docs/下拉框排查经验库.md` — 前端下拉框问题排查经验
 - `docs/Windows-1.1.0-安装包实测清单.md` — Windows 包人工实测验收清单（含原地升级路径与错误场景判读；文件名版本号随发布更新，留意实际存在哪个版本）
-- `docs/可行性分析报告.md` / `docs/生产级优化方案.md` — 立项分析与优化路线（历史文档，不一定反映现状）
+- `docs/可行性分析报告.md` / `docs/生产级优化方案.md` — 立项分析与优化路线（2026-10-28 移入 docs/；历史文档，标题仍为旧名「starpick」，含定时采集/7 分类等过时内容，仅供参考勿当真实现依据）
