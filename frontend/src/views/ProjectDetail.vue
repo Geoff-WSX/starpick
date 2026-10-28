@@ -108,7 +108,6 @@ watch(() => props.id, load)
 // ---- README 语言切换（原文 / 中文 / English / 按需加载的其它语言） ----
 type ReadmeLangKey = 'default' | 'zh' | 'en' | 'extra'
 const readmeLang = ref<ReadmeLangKey>('default')
-
 // 原文正文是否以中文为主（CJK 占比 > 0.5%，与后端 detect_zh_friendly 阈值一致）
 function isChineseReadme(text: string): boolean {
   if (!text) return false
@@ -203,8 +202,16 @@ const readmeLangs = computed(() => {
   return opts
 })
 
+/** 用户是否手动切换过语言（true 后不再自动默认中文，尊重用户选择） */
+let userPickedLang = false
+
 watch(readmeLangs, (opts) => {
-  // 默认展示中文版（项目定位中文用户）；无中文版则回到原文
+  // 默认展示中文版（项目定位中文用户）：有 readme_zh 且用户未手动切换过 → 默认中文
+  if (!userPickedLang && readmeLang.value === 'default' && opts.some((o) => o.key === 'zh')) {
+    readmeLang.value = 'zh'
+    return
+  }
+  // 当前 tab 不存在（如新抓取的变体被移除）→ 兜底回退
   if (!opts.some((o) => o.key === readmeLang.value)) {
     readmeLang.value = opts.some((o) => o.key === 'zh') ? 'zh' : 'default'
   }
@@ -352,6 +359,7 @@ async function loadExtraVariant(path: string, label: string) {
 }
 
 function switchLang(key: ReadmeLangKey) {
+  userPickedLang = true
   extraError.value = ''
   readmeLang.value = key
 }
