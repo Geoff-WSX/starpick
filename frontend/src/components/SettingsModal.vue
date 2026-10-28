@@ -118,6 +118,25 @@ const repoHost = computed(() => {
   try { return new URL(info.value?.repo_url ?? '').hostname + new URL(info.value?.repo_url ?? '').pathname } catch { return info.value?.repo_url ?? '' }
 })
 
+// ---- 模型中转站推荐（「关于」页底部）：注册跳转 + Base URL 一键复制 ----
+interface ModelSourceLink {
+  label: string
+  signupUrl: string
+  baseUrl: string
+}
+const MODEL_SOURCE_LINKS: ModelSourceLink[] = [
+  { label: '芯谷 AI（国内模型）', signupUrl: 'https://api.xingu-ai.com/sign-up?aff=iC5W', baseUrl: 'https://api.xingu-ai.com' },
+  { label: '芯谷 AI（国外模型）', signupUrl: 'https://www.xinguhub.com/sign-up?aff=lyKd', baseUrl: 'https://api.xinguhub.com' },
+]
+const copiedBaseUrl = ref('')
+async function copyBaseUrl(baseUrl: string) {
+  try {
+    await navigator.clipboard.writeText(baseUrl)
+    copiedBaseUrl.value = baseUrl
+    setTimeout(() => { if (copiedBaseUrl.value === baseUrl) copiedBaseUrl.value = '' }, 2000)
+  } catch { /* 剪贴板不可用时静默 */ }
+}
+
 function close() {
   emit('close')
 }
@@ -237,6 +256,31 @@ function close() {
             </div>
             <div v-if="checkError" class="settings-hint">{{ checkError }}</div>
             <p class="settings-desc">应用每 6 小时自动检查一次新版本；仓库地址可随时查看源码与发布说明。</p>
+          </div>
+
+          <!-- 模型中转站推荐：注册开通 + Base URL 一键复制（来源 prompt-gen 同款清单） -->
+          <div class="settings-group">
+            <div class="settings-title"><span>模型中转站推荐</span></div>
+            <div class="model-source-list">
+              <div v-for="src in MODEL_SOURCE_LINKS" :key="src.label" class="model-source-row">
+                <span class="model-source-name">{{ src.label }}</span>
+                <a
+                  class="settings-link"
+                  :href="src.signupUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >注册开通 ↗</a>
+                <button
+                  type="button"
+                  class="model-source-url"
+                  :title="`复制 ${src.baseUrl}`"
+                  @click="copyBaseUrl(src.baseUrl)"
+                >
+                  {{ copiedBaseUrl === src.baseUrl ? '已复制 ✓' : src.baseUrl }}
+                </button>
+              </div>
+            </div>
+            <p class="settings-desc">中转站用于获取大模型 API 密钥与接口地址（OpenAI 兼容格式）；列表仅供参考，请自行判断平台可靠性。</p>
           </div>
         </div>
       </template>

@@ -2783,3 +2783,43 @@ a:hover {
 .settings-link.mono {
   font-family: var(--mono);
 }
+
+/* 「关于」模型中转站推荐：行内名称 + 注册链接 + Base URL 一键复制 */
+.model-source-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
+}
+.model-source-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.model-source-name {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 600;
+  flex-shrink: 0;
+  min-width: 130px;
+}
+.model-source-url {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--bg-tint);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.model-source-url:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.model-source-url:active {
+  color: var(--ok);
+  border-color: var(--ok);
+}
