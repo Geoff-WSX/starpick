@@ -248,6 +248,24 @@ function resolveReadme(
     }
     return m.replace(`src="${src}"`, `src="${newSrc}"`)
   })
+  // HTML <a> 链接：部分 README 用 HTML 而非 Markdown 写语言切换（如 transformers 的
+  // <a href="i18n/README_zh-hans.md">简体中文</a>）——同样转站内切换，否则点击跳相对路由变空白页
+  md = md.replace(/<a\s+[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, (m, href: string, inner: string) => {
+    if (href.startsWith('#')) return m
+    if (/^[a-z][a-z0-9+.-]*:/i.test(href)) return m   // 绝对协议（http/mailto 等）保持原样
+    const p = repoRelativePath(href, fullName, baseDir)
+    if (!p) return m
+    const file = p.split('/').pop() || ''
+    const lang = variantLang(file)
+    if (lang) {
+      const label = inner.replace(/<[^>]+>/g, '').trim()
+      return `<a href="#readme-local" data-variant="${escapeHtmlAttr(p)}" data-lang="${escapeHtmlAttr(lang)}" data-label="${escapeHtmlAttr(label)}" class="lang-switch" title="在本站内查看该语言版本">${inner}</a>`
+    }
+    if (!p.includes('/') && DEFAULT_README_NAMES.some((n) => n.toLowerCase() === file.toLowerCase())) {
+      return `<a href="#readme-default" data-lang="default" class="lang-switch" title="在本站内切换语言">${inner}</a>`
+    }
+    return m   // 其它相对路径的 HTML 链接保持原样（GitHub 页内跳转）
+  })
   // 链接：语言变体（含子目录/绝对链接写法）→ 站内语言切换；其余相对路径 → GitHub blob 页
   // 文本允许嵌套图片（徽章式 [![xx](badge)](path)）——旧正则 [^\]]* 会把嵌套的 ]( 截断，
   // 语言链接被误当普通链接 → 点击跳相对路由变空白页（2026-10-28 定位）
