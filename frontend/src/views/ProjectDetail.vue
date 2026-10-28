@@ -8,6 +8,7 @@ import {
   detectOS,
   fetchHealthSnapshots,
   fetchProjectDetail,
+  fetchOwnerProjects,
   fetchReadmeVariant,
   fetchSimilarProjects,
   formatDate,
@@ -81,6 +82,15 @@ async function loadSimilar() {
   }
 }
 
+// 同作者其它项目
+const ownerProjects = ref<Project[]>([])
+async function loadOwnerProjects() {
+  try {
+    const data = await fetchOwnerProjects(projectId.value)
+    ownerProjects.value = data.items
+  } catch { /* 无则隐藏 */ }
+}
+
 async function load() {
   loading.value = true
   error.value = ''
@@ -95,6 +105,7 @@ async function load() {
     favGroup.value = detail.value.favorite_group ?? ''
     loadHealth()
     loadSimilar()
+    loadOwnerProjects()
   } catch (e) {
     error.value = e instanceof Error ? e.message : '加载项目失败'
   } finally {
@@ -302,6 +313,7 @@ const extraVariant = ref<VariantView | null>(null)
 const extraLoading = ref('')
 const extraError = ref('')
 const extraErrorPath = ref('')
+const extraErrorLabel = ref('')
 
 const extraFallbackUrl = computed(() => {
   const p = extraVariant.value?.path || extraErrorPath.value
@@ -352,10 +364,17 @@ async function loadExtraVariant(path: string, label: string) {
     readmeLang.value = 'extra'
   } catch {
     extraErrorPath.value = path
+    extraErrorLabel.value = label
     extraError.value = `「${label}」版本暂时无法通过镜像获取（可能已改名或删除）`
   } finally {
     extraLoading.value = ''
   }
+}
+
+/** 镜像抓取失败后的手动重试（镜像偶发抖动，重试常能成功） */
+async function retryExtraVariant() {
+  if (!extraErrorPath.value) return
+  await loadExtraVariant(extraErrorPath.value, extraErrorLabel.value)
 }
 
 function switchLang(key: ReadmeLangKey) {
@@ -672,6 +691,7 @@ function back() {
         <div v-if="extraLoading" class="variant-hint">正在从镜像抓取「{{ extraLoading }}」版本…</div>
         <div v-else-if="extraError" class="variant-hint error">
           {{ extraError }}
+          <button class="btn small" :disabled="!!extraLoading" @click="retryExtraVariant">重试</button>
           <a v-if="extraFallbackUrl" :href="extraFallbackUrl" target="_blank" rel="noopener" @click.prevent="openExternal(extraFallbackUrl)">在 GitHub 打开</a>
         </div>
         <div v-if="readmeHtml" class="markdown-body" v-html="readmeHtml" @click="onReadmeClick"></div>
@@ -689,6 +709,30 @@ function back() {
         <div class="similar-grid">
           <router-link
             v-for="s in similar"
+            :key="s.id"
+            :to="`/project/${s.id}`"
+            class="similar-card"
+          >
+            <div class="similar-name">{{ s.name }}</div>
+            <div class="similar-desc">{{ s.description || '（无简介）' }}</div>
+            <div class="similar-meta">
+              <span class="tag">{{ s.category }}</span>
+              <span v-if="s.language" class="tag lang">{{ s.language }}</span>
+              <span class="stars">★ {{ formatStars(s.stars) }}</span>
+            </div>
+          </router-link>
+        </div>
+      </section>
+
+      <!-- 同作者其它项目 -->
+      <section v-if="ownerProjects.length > 0" class="panel">
+        <div class="readme-head">
+          <span>同作者其它项目</span>
+          <span class="hint">来自 {{ detail?.owner }} 的其它收录</span>
+        </div>
+        <div class="similar-grid">
+          <router-link
+            v-for="s in ownerProjects"
             :key="s.id"
             :to="`/project/${s.id}`"
             class="similar-card"

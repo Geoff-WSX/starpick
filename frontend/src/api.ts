@@ -479,6 +479,10 @@ export function fetchSimilarProjects(projectId: number): Promise<{ items: Projec
   return getJson(`/api/projects/${projectId}/similar`)
 }
 
+export function fetchOwnerProjects(projectId: number): Promise<{ items: Project[] }> {
+  return getJson(`/api/projects/${projectId}/owner`)
+}
+
 /** 按需抓取 README 语言变体（README 内语言切换链接未预先采集时；仅本仓库变体路径） */
 export function fetchReadmeVariant(
   projectId: number,

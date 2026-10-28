@@ -566,6 +566,18 @@ def similar_projects(project_id: int, limit: int = Query(default=5, ge=1, le=10)
     return {"items": [_project_out(r).model_dump() for r in items]}
 
 
+@app.get("/api/projects/{project_id}/owner", response_model=dict[str, Any])
+def owner_projects(project_id: int, limit: int = Query(default=5, ge=1, le=10)) -> dict[str, Any]:
+    """同作者其它项目（按 star 排序，排除当前项目）。"""
+    if state.db is None:
+        raise HTTPException(status_code=503, detail="服务未就绪")
+    row = state.db.get_project(project_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    items = state.db.owner_projects(row["owner"], project_id, limit)
+    return {"items": [_project_out(r).model_dump() for r in items]}
+
+
 @app.get("/api/projects/{project_id}/readme-variant", response_model=ReadmeVariantOut)
 def project_readme_variant(
     project_id: int,

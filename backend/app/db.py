@@ -942,8 +942,10 @@ class Database:
             params.append(f'%"{self._escape_like(platform)}"%')
         if keyword:
             like = f"%{self._escape_like(keyword)}%"
-            clauses.append("(name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')")
-            params.extend([like, like])
+            clauses.append(
+                "(name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR topics LIKE ? ESCAPE '\\')"
+            )
+            params.extend([like, like, like])
         if new_since:
             clauses.append("first_seen_at >= ?")
             params.append(new_since)
@@ -983,6 +985,16 @@ class Database:
                 "WHERE category=? AND stars BETWEEN ? AND ? AND id!=? "
                 "ORDER BY stars DESC LIMIT ?",
                 (category, lo, hi, project_id, limit),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def owner_projects(self, owner: str, project_id: int, limit: int = 5) -> list[dict]:
+        """同作者其它项目（按 star 排序，排除当前项目）。"""
+        with self._lock:
+            rows = self._conn.execute(
+                f"SELECT {_LIST_COLS} FROM projects "
+                "WHERE owner=? AND id!=? ORDER BY stars DESC LIMIT ?",
+                (owner, project_id, limit),
             ).fetchall()
             return [dict(r) for r in rows]
 
