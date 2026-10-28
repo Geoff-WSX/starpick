@@ -8,7 +8,7 @@
 
 #define MyAppName "STARPICK"
 #define MyAppExeName "StarPick.exe"
-#define MyAppVersion "1.0"
+#define MyAppVersion "1.1"
 
 [Setup]
 ; AppId 双写 {{ 是 Inno 脚本的转义写法：落盘为 {8A7C...}，改版升级/卸载靠它匹配
