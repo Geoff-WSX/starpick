@@ -35,6 +35,16 @@ README、图片、下载直链自动走国内镜像加速（gh-proxy.com / ghpro
 - **收藏与推荐**：一键收藏自动按分类归档；每日精选榜单；Star 翻倍自动再推荐
 - **自己掌控采集**：手动触发、按分类采、可选阈值；列表/筛选/搜索状态全部同步 URL，刷新分享不丢
 
+## 界面预览
+
+![首页深色主题（默认）](docs/截图-首页深色.png)
+
+![首页浅色主题](docs/截图-首页浅色.png)
+
+![项目详情页（默认展示中文 README）](docs/截图-详情页.png)
+
+![设置弹窗（Token 配置 / 关于 / 模型中转站）](docs/截图-设置弹窗.png)
+
 ## 桌面版安装包（推荐）
 
 **下载地址：[GitHub Releases 最新版](https://github.com/Geoff-WSX/starpick/releases/latest)**
