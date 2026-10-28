@@ -32,7 +32,7 @@ cd frontend && npm run dev      # http://localhost:5173
 
 ## Git 与远端
 
-- 仓库 `https://github.com/Geoff-WSX/starpick`（分支 `main`，已公开）。**2026-10-24 版本重置：v1.0.0~v1.3.0 均为测试版，其 Release（含资产）与 tag 已全部删除，正式版从 v1.0 起步；v1.1（2026-10-28）已发布，当前 Latest=v1.1**；tag 触发 Windows CI 自动产 setup.exe 上 Release，macOS dmg 手动补传。Windows 分支不在同一仓库（见 FORK.md），不要往这个仓库里塞 Windows 专有内容（start.bat 已删）。
+- 仓库 `https://github.com/Geoff-WSX/starpick`（分支 `main`，已公开）。**2026-10-24 版本重置：v1.0.0~v1.3.0 均为测试版，其 Release（含资产）与 tag 已全部删除，正式版从 v1.0 起步；v1.2（2026-10-28）已发布，当前 Latest=v1.2**；tag 触发 Windows CI 自动产 setup.exe 上 Release，macOS dmg 手动补传。Windows 分支不在同一仓库（见 FORK.md），不要往这个仓库里塞 Windows 专有内容（start.bat 已删）。
 - **直连 `github.com` 会被墙，但 `api.github.com` 可以直连**——现象是 `gh` 建库/查 API 一切正常、`git push` 却超时（或报 HTTP2 framing error）。本仓库 `.git/config` 已写死 `http.proxy=http://127.0.0.1:7890` 与 `http.version=HTTP/1.1`，推送/拉取前确认本机代理在运行；凭据走 `credential.helper='!gh auth git-credential'`（Token 从 gh 钥匙串取，不落盘，不要改成把 Token 写进 URL）。
 - 永不提交：`history.db*`、`backend/data/`（备份目录）、`logs/`、`*.log*`、`.runtime_token`、`frontend/dist/`、`node_modules/`、`.venv/`、`*.tsbuildinfo`、编译产物 `frontend/vite.config.js` 与其 `.d.ts`。推前自查：`git ls-files | grep -Ei '\.env$|runtime_token|\.db|node_modules|dist/|\.log'` 应无输出。
 
@@ -99,7 +99,7 @@ packaging/               # 桌面打包：spec/双平台构建脚本/Inno 配置
 - `SettingsModal.vue` 是**选项卡**结构（`tab`/`about`/`models` 三页，`.settings-tabs/.settings-tab` 样式在 style.css）：配置页=Token+限流，关于页=版本/检查更新/一键更新，模型中转站页=推荐列表（芯谷 AI 国内/国外，注册跳转 + 整行可点，数据硬编码前端常量 `MODEL_SOURCE_LINKS`）。新增设置项先进对应选项卡。
 - `GET /api/settings` 返回 `version` / `repo_url` / `app_update` / `deployment`（`desktop`=打包壳 / `web`=源码网页服务，按 `paths.is_frozen()` 判定）；`POST /api/app/update-check` 手动触发（后台线程 + `app_update_checking` 防重入）。结果缓存在 `state.app_update`（内存态，不入库），status 取值 `none/up_to_date/newer/unknown`。
 - **部署形态区分更新引导**：`deployment=web` 时「发现新版本」不显示下载安装包链接，只提示 git pull 重启；`deployment=desktop` 时显示「下载并自动更新」+「手动下载」降级链接。
-- **Windows 一键自动更新（2026-10-28）**：`POST /api/app/update-download`（仅 frozen+win32 可用，返回最新 setup.exe 直链，走独立 requests 不走采集限流器）→ 前端调桌面壳桥 `pywebview.api.update_and_exit(url, name)` → `desktop.py` 下载到临时目录 → 停内嵌服务（`_stop_uvicorn`）→ `subprocess` 以 `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART` 启动安装器 → 进程退出。installer.iss 已加 `CloseApplications=yes` 支持静默覆盖。**当前线上 Latest=v1.1 仍为旧安装器配置，一键更新自下版起生效。**
+- **Windows 一键自动更新（2026-10-28，v1.2 起生效）**：`POST /api/app/update-download`（仅 frozen+win32 可用，返回最新 setup.exe 直链，走独立 requests 不走采集限流器）→ 前端调桌面壳桥 `pywebview.api.update_and_exit(url, name)` → `desktop.py` 下载到临时目录 → 停内嵌服务（`_stop_uvicorn`）→ `subprocess` 以 `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART` 启动安装器 → 进程退出。installer.iss 已加 `CloseApplications=yes` 支持静默覆盖。v1.2 起安装器已含该配置，一键更新生效。
 - `GITHUB_REPO = "Geoff-WSX/starpick"` 常量在 `backend/app/main.py`（设置页「关于」与更新检查共用）；仓库换了要同步改。
 - **检查更新绝不能走 `GithubClient`/`get_latest_release`**：那个走采集限流器（匿名 60 次/小时），全量扫荡期间会排队数分钟卡死手动检查——必须保持 `_check_app_update()` 的独立 requests 请求（超时 8s，任何失败归 `unknown`）。仓库公开后匿名即可查到 Release；当前 token（`github_pat_` fine-grained）反而读不到私有仓库 Release 的历史遗留问题，公开后无所谓。
 - 版本比较用 `_parse_tag_version`（v 前缀剥离 + 数字元组比较；非语义化 tag → `unknown` 并原样显示 latest_tag）。改 `APP_VERSION` 时注意：本地版本低于线上 latest Release 时，旧版安装包会真弹「发现新版本」。
@@ -165,8 +165,8 @@ packaging/               # 桌面打包：spec/双平台构建脚本/Inno 配置
 - **自检机制（CI 冒烟与打包验收依赖）**：`--selftest` 无窗口起服务→探活→校验静态页→退出。`STARPICK_SELFTEST=1` 会关闭启动补跑采集（空库 + 真 token 的组合绝不能发真实网络请求）；`STARPICK_SELFTEST_REPORT=<path>` 把输出写文件（Windows `console=False` 的 exe 在 CI 里 stdout 是 NUL，不写文件什么都看不到）；`STARPICK_SELFTEST_WEBVIEW=1` 额外校验 GUI 栈可导入。改 desktop/main/config 三者之一要复跑 `test_desktop.py` + `test_paths.py`。
 - **回环请求绝不走系统代理**：本机探测（/health、自检 GET）必须用 `desktop._urlopen_local()`（`ProxyHandler({})`）——macOS urllib 会读系统代理设置（Clash/表哥云），127.0.0.1 请求被转给代理后桌面壳会误报"启动失败"。WKWebView 自身直连回环，不受影响。
 - **构建入口与产物**：macOS `./packaging/macos/build_macos.sh [版本号]` → `packaging/dist/StarPick.app` + `StarPick-<版本>-arm64.dmg`（本地构建，构建用 `packaging/.venv-build`，勿用 Anaconda base——PyInstaller 不支持）；Windows `packaging/windows/build_windows.ps1` + `installer.iss`（Inno Setup，Per-user 无 UAC）→ CI `.github/workflows/build-windows.yml`（windows-latest 自带 Inno Setup 6，产物 `StarPick-*-setup.exe` + `selftest-report.txt`；tag `v*` 触发自动传 Release；要拿 `selftest-report.txt`/setup.exe 复盘用 `gh run download <run-id>`）。本机 PyInstaller 无法交叉编译 Windows 包，Windows 产物只能 CI 出；**验证 CI 包别解 Inno**——`gh run view --log` 的 `Compressing:` 行就是完整文件清单，版本读 setup.exe 内 UTF-16 版本资源（本机 innoextract 装不上，别再折腾）。
-- **版本号三处同步**：spec `VERSION`、`installer.iss` `MyAppVersion`、`app.main.APP_VERSION`（+ git tag 共四处）；改一处要同步其余（v1.0/v1.1 已两次走通全流程）。桌面壳窗口标题由 `desktop.py _window_title()` 生成（`STARPICK vX.Y.Z`）。
-- **macOS dmg 要手动补传 Release**：CI 只产 Windows setup.exe；macOS 包打完要 `gh release upload vX.Y.Z packaging/dist/StarPick-<版本>-arm64.dmg`（v1.0 起一直如此，v1.1 也补传过）。用户"从 GitHub 下载安装"的前提是线上资产齐全。
+- **版本号四处同步**：spec `VERSION`、`installer.iss` `MyAppVersion`、`app.main.APP_VERSION`、**README 下载表文件名**（+ git tag 共五处）；改一处要同步其余（v1.0/v1.1/v1.2 已走通全流程，v1.2 曾漏改 README 文件名被用户发现）。桌面壳窗口标题由 `desktop.py _window_title()` 生成（`STARPICK vX.Y.Z`）。
+- **macOS dmg 要手动补传 Release**：CI 只产 Windows setup.exe；macOS 包打完要 `gh release upload vX.Y.Z packaging/dist/StarPick-<版本>-arm64.dmg`（v1.0 起一直如此，v1.2 也补传过）。用户"从 GitHub 下载安装"的前提是线上资产齐全。
 - **卸载/升级保留数据**：Inno `[UninstallDelete]` 特意不删数据目录；v1.0.0→v1.1.0 实测可原地升级。
 
 ## 采集分类匹配契约（2026-10-25 修复后）
