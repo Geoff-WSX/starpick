@@ -661,6 +661,8 @@ def get_settings() -> dict[str, Any]:
         "version": APP_VERSION,
         "repo_url": f"https://github.com/{GITHUB_REPO}",
         "app_update": _app_update_state_payload(),
+        # 部署形态：desktop=桌面安装包（更新引导下载新安装包）/ web=本地网页服务（拉代码重启）
+        "deployment": "desktop" if paths.is_frozen() else "web",
     }
 
 

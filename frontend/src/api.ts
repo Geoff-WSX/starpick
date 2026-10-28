@@ -505,6 +505,8 @@ export interface SettingsState {
   version: string
   repo_url: string
   app_update: AppUpdateState
+  /** 部署形态：desktop=桌面安装包 / web=本地网页服务 */
+  deployment: 'desktop' | 'web'
 }
 
 export function fetchSettings(): Promise<SettingsState> {

@@ -234,13 +234,17 @@ function close() {
               </button>
             </div>
             <a
-              v-if="updateLine.cls === 'upd'"
+              v-if="updateLine.cls === 'upd' && info.deployment === 'desktop'"
               class="settings-link"
               :href="info.repo_url + '/releases/latest'"
               target="_blank"
               rel="noopener"
               @click.prevent="openExternal(info.repo_url + '/releases/latest')"
             >前往下载新版本 ↗</a>
+            <div
+              v-else-if="updateLine.cls === 'upd' && info.deployment === 'web'"
+              class="settings-hint"
+            >本地网页部署不适用安装包更新——请拉取最新代码（git pull）后重启服务。</div>
             <div class="settings-about-row">
               <span class="about-label">项目地址</span>
               <a
