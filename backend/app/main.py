@@ -721,6 +721,49 @@ def trigger_app_update_check() -> dict[str, Any]:
     return {"ok": True, "app_update": _app_update_state_payload()}
 
 
+@app.post("/api/app/update-download", response_model=dict[str, Any])
+def app_update_download() -> dict[str, Any]:
+    """返回最新 Windows 安装包直链（桌面壳「一键更新」用）。
+
+    仅桌面壳（frozen）暴露；本地网页服务返回明确错误（网页部署用 git pull）。
+    只查询资产直链，不下载不执行——下载与静默安装由 desktop.py 完成。
+    """
+    if not paths.is_frozen():
+        raise HTTPException(status_code=400, detail="网页部署请用 git pull 更新，无安装包")
+    import sys
+    if sys.platform != "win32":
+        raise HTTPException(status_code=501, detail="仅 Windows 桌面版支持一键自动更新")
+    # 复用 _check_app_update 的独立请求路径查最新 Release（不走采集限流器）
+    try:
+        import requests
+        headers = {"Accept": "application/vnd.github+json", "User-Agent": "StarPick-App"}
+        resp = requests.get(
+            f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
+            headers=headers, timeout=8,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        tag = (data.get("tag_name") or "").strip()
+        latest = _parse_tag_version(tag)
+        current = _parse_tag_version(APP_VERSION)
+        if latest is None or current is None or latest <= current:
+            raise HTTPException(status_code=409, detail="当前已是最新版本")
+        asset = next(
+            (a for a in data.get("assets", []) if a["name"].endswith("-setup.exe")),
+            None,
+        )
+        if not asset:
+            raise HTTPException(status_code=404, detail="最新版本未找到 Windows 安装包资产")
+        return {
+            "ok": True,
+            "latest_tag": tag,
+            "download_url": asset["browser_download_url"],
+            "file_name": asset["name"],
+        }
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"检查最新版本失败: {exc}") from exc
+
+
 @app.get("/api/collect/params", response_model=dict[str, Any])
 def collect_params() -> dict[str, Any]:
     """当前采集参数（供前端下拉框展示默认值）。"""

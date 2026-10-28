@@ -1,8 +1,8 @@
 <script setup lang="ts">
-// 设置弹窗：GitHub Token 配置（保存后热生效）+「关于」（版本 / 检查更新 / 项目地址）
+// 设置弹窗：GitHub Token 配置（保存后热生效）+「关于」（版本 / 检查更新 / 一键更新）+「模型中转站」
 import { computed, ref, watch } from 'vue'
 import {
-  fetchSettings, saveToken, clearToken, checkAppUpdate, openExternal,
+  fetchSettings, saveToken, clearToken, checkAppUpdate, fetchAppUpdateDownload, openExternal,
   type SettingsState,
 } from '../api'
 
@@ -117,6 +117,31 @@ const updateLine = computed(() => {
 const repoHost = computed(() => {
   try { return new URL(info.value?.repo_url ?? '').hostname + new URL(info.value?.repo_url ?? '').pathname } catch { return info.value?.repo_url ?? '' }
 })
+
+/** 一键更新（仅 Windows 桌面壳）：取直链 → 调桌面壳桥下载并静默安装 → 进程退出 */
+const updating = ref(false)
+const updateError = ref('')
+async function oneClickUpdate() {
+  if (updating.value) return
+  updating.value = true
+  updateError.value = ''
+  try {
+    const r = await fetchAppUpdateDownload()
+    const bridge = (window as { pywebview?: { api?: { update_and_exit?: (u: string, n: string) => string } } })
+      .pywebview?.api
+    if (!bridge?.update_and_exit) {
+      updateError.value = '当前非桌面壳环境，无法一键更新'
+      return
+    }
+    const err = bridge.update_and_exit(r.download_url, r.file_name)
+    if (err) updateError.value = err
+    // 成功后桌面壳自行退出，无需处理
+  } catch (e) {
+    updateError.value = e instanceof Error ? e.message : '一键更新失败'
+  } finally {
+    updating.value = false
+  }
+}
 
 // ---- 模型中转站推荐（独立选项卡）：点击链接直接跳转（桌面壳走系统浏览器，网页开新标签） ----
 interface ModelSourceLink {
@@ -233,14 +258,23 @@ function close() {
                 {{ checking ? '检查中…' : '立即检查' }}
               </button>
             </div>
-            <a
+            <div
               v-if="updateLine.cls === 'upd' && info.deployment === 'desktop'"
-              class="settings-link"
-              :href="info.repo_url + '/releases/latest'"
-              target="_blank"
-              rel="noopener"
-              @click.prevent="openExternal(info.repo_url + '/releases/latest')"
-            >前往下载新版本 ↗</a>
+              class="settings-about-row"
+            >
+              <span class="about-label">一键更新</span>
+              <button class="btn small" :disabled="updating" @click="oneClickUpdate">
+                {{ updating ? '下载并安装中…' : '下载并自动更新' }}
+              </button>
+              <a
+                class="settings-link"
+                :href="info.repo_url + '/releases/latest'"
+                target="_blank"
+                rel="noopener"
+                @click.prevent="openExternal(info.repo_url + '/releases/latest')"
+              >手动下载 ↗</a>
+            </div>
+            <div v-if="updateError" class="settings-hint">{{ updateError }}</div>
             <div
               v-else-if="updateLine.cls === 'upd' && info.deployment === 'web'"
               class="settings-hint"

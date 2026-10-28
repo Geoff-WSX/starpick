@@ -29,6 +29,10 @@ ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=lowest
 WizardStyle=modern
 SetupIconFile=..\icon.ico
+; 一键自动更新：/VERYSILENT 静默安装时先关旧实例再覆盖（AppId 相同、数据保留）
+CloseApplications=yes
+; 静默模式下不显示重启提示（应用无重启需求，下次启动即新版）
+RestartApplications=no
 VersionInfoCopyright=MIT License
 VersionInfoDescription=GitHub 公开项目自动发现与下载引导工具
 

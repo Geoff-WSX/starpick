@@ -197,6 +197,10 @@ class _JsApi:
     不属于该类型），用户点击下载毫无反应——见 frontend/src/api.ts openExternal()。
     """
 
+    def __init__(self, stop_server: callable | None = None) -> None:
+        # stop_server 注入：一键更新前先停内嵌服务（由 _open_window 传入）
+        self._stop_server = stop_server
+
     def open_external(self, url: str) -> None:
         import webbrowser
 
@@ -204,9 +208,57 @@ class _JsApi:
             return
         webbrowser.open(url, 2, True)   # new=2 新标签；下载/分享等外链交给系统默认浏览器
 
+    def update_and_exit(self, download_url: str, file_name: str) -> str:
+        """Windows 桌面壳一键更新：下载新安装包 → 静默安装 → 退出当前进程。
 
-def _open_window(url: str) -> None:
-    """打开内嵌窗口（阻塞直到窗口关闭）；private_mode=False 让主题等 localStorage 持久化。"""
+        下载失败/非 Windows 返回错误文案；安装器由系统接管，本进程退出后
+        由 Inno Setup 覆盖安装（AppId 相同、数据保留），下次启动即新版。
+        """
+        if sys.platform != "win32":
+            return "仅 Windows 桌面版支持一键自动更新"
+        if not download_url.startswith("https://"):
+            return "无效的下载地址"
+        try:
+            import tempfile
+            import urllib.request
+
+            dest = Path(tempfile.gettempdir()) / (file_name or "starpick-setup.exe")
+            log = logging.getLogger("kazumi")
+            log.info("开始下载新版本安装包：%s", download_url)
+            urllib.request.urlretrieve(download_url, dest)   # 系统级下载，无代理依赖
+            log.info("下载完成（%d 字节），启动静默安装", dest.stat().st_size)
+            if self._stop_server is not None:
+                self._stop_server()
+            subprocess.Popen(
+                [str(dest), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"],
+                close_fds=True,
+            )
+            # 本进程退出：安装器覆盖旧文件后，用户下次启动即新版
+            threading.Timer(1.0, os._exit, args=(0,)).start()
+            return ""
+        except Exception as exc:
+            log.exception("一键更新失败")
+            return f"更新失败: {exc}"
+
+
+def _stop_uvicorn(server) -> None:
+    """优雅停止内嵌 uvicorn（一键更新/窗口关闭共用）。"""
+    if server is None:
+        return
+    server.should_exit = True
+    # 等采集收尾最多 20s（与 main 尾部逻辑一致），随后 uvicorn 线程自行退出
+    import time as _time
+    for _ in range(200):
+        if not getattr(server, "threads", None) or not any(t.is_alive() for t in server.threads):
+            break
+        _time.sleep(0.1)
+
+
+def _open_window(url: str, stop_server: callable | None = None) -> None:
+    """打开内嵌窗口（阻塞直到窗口关闭）；private_mode=False 让主题等 localStorage 持久化。
+
+    stop_server：一键更新时先停内嵌服务（由 main() 传入），保证安装器能覆盖程序文件。
+    """
     import webview
     from webview.menu import Menu, MenuAction
 
@@ -245,7 +297,7 @@ def _open_window(url: str) -> None:
     webview.create_window(
         _window_title(), url, width=1280, height=860, min_size=(980, 640),
         text_select=True,   # 允许选中/复制 README 文字（默认 False）
-        js_api=_JsApi(),    # 前端 openExternal() 走此桥（window.open 在窗口内静默失效）
+        js_api=_JsApi(stop_server=stop_server),    # 前端 openExternal()/一键更新走此桥
     )
     webview.start(menu=menu, localization=localization,
                   private_mode=False, storage_path=str(storage_dir))
@@ -446,7 +498,10 @@ def main(argv: list[str] | None = None) -> int:
         log.info("内嵌服务已就绪：http://127.0.0.1:%d", port)
 
     try:
-        _open_window(f"http://127.0.0.1:{port}")
+        _open_window(
+            f"http://127.0.0.1:{port}",
+            stop_server=lambda: (_stop_uvicorn(server) if started and server is not None else None),
+        )
     except KeyboardInterrupt:
         pass
     except Exception as exc:

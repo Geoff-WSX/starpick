@@ -522,6 +522,22 @@ export async function checkAppUpdate(): Promise<void> {
   }
 }
 
+/** 一键更新：返回最新 Windows 安装包直链（仅桌面壳；下载与静默安装由桌面壳桥执行） */
+export interface AppUpdateDownload {
+  ok: boolean
+  latest_tag: string
+  download_url: string
+  file_name: string
+}
+export async function fetchAppUpdateDownload(): Promise<AppUpdateDownload> {
+  const resp = await fetch('/api/app/update-download', { method: 'POST' })
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => null)
+    throw new Error(body?.detail ?? `HTTP ${resp.status}`)
+  }
+  return resp.json() as Promise<AppUpdateDownload>
+}
+
 export async function saveToken(token: string): Promise<SettingsState> {
   const resp = await fetch('/api/settings/token', {
     method: 'POST',

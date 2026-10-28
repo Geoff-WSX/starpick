@@ -173,3 +173,11 @@ def test_manual_check_endpoint_triggers(settings_client, monkeypatch):
     while not fired and time.time() < deadline:
         time.sleep(0.05)
     assert fired, "后台检查线程未执行"
+
+
+def test_update_download_rejected_in_web_mode(settings_client, monkeypatch):
+    """网页部署（非 frozen）调用一键更新接口应被拒绝——本地部署无安装包。"""
+    monkeypatch.setattr(main.paths, "is_frozen", lambda: False)
+    resp = settings_client.post("/api/app/update-download")
+    assert resp.status_code == 400
+    assert "git pull" in resp.json()["detail"]
