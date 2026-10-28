@@ -545,7 +545,7 @@ function back() {
             {{ detail.lang === 'zh' ? '中文' : '英文' }}
           </span>
           <span v-if="detail.language" class="tag lang">{{ detail.language }}</span>
-          <span v-if="detail.zh_friendly" class="tag zh">中文友好</span>
+          <span v-if="detail.zh_friendly" class="tag zh" title="官方提供中文文档或说明（官网/仓库），对中文用户友好">中文友好</span>
           <span v-for="p in detail.platforms" :key="p" class="tag platform">{{ p }}</span>
           <span class="tag">更新 {{ formatDate(detail.pushed_at) }}</span>
         </div>
