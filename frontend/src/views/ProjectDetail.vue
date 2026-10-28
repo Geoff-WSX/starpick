@@ -124,11 +124,13 @@ const ZH_HANT_CODES = new Set(['zht', 'tw', 'hk', 'hant', 'tcn', 'zhtw', 'zhhk',
 const EN_CODES = new Set(['en', 'eng', 'english'])
 const OTHER_LANG_CODES = new Set([
   'ar', 'az', 'be', 'bg', 'bn', 'ca', 'cs', 'da', 'de', 'el', 'es', 'et', 'eu',
-  'fa', 'fi', 'fr', 'gl', 'he', 'hi', 'hr', 'hu', 'hy', 'id', 'is', 'it', 'ja',
+  'fa', 'fi', 'fr', 'gl', 'he', 'hi', 'hd', 'hr', 'hu', 'hy', 'id', 'is', 'it', 'ja',
   'jp', 'ka', 'kk', 'km', 'kn', 'ko', 'kr', 'ky', 'lo', 'lt', 'lv', 'mk', 'ml',
   'mn', 'mr', 'ms', 'my', 'ne', 'nl', 'no', 'pa', 'pl', 'ps', 'pt', 'ro', 'ru',
   'si', 'sk', 'sl', 'sq', 'sr', 'sv', 'sw', 'ta', 'te', 'th', 'tl', 'tr', 'ua',
   'uk', 'ur', 'uz', 'vi',
+  // 区域双码（README.pt-BR.md / ja-JP / ko-KR 等，压缩后首码对应主语言）
+  'ptbr', 'jajp', 'kokr', 'enus', 'ruru', 'eses', 'trtr', 'nlnl', 'frfr', 'idid', 'dede',
 ])
 const DEFAULT_README_NAMES = ['README.md', 'readme.md', 'README', 'Readme.md']
 

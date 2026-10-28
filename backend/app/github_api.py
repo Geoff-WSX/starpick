@@ -50,11 +50,13 @@ _EN_CODES = {"en", "eng", "english"}
 # 非语言后缀不在表内，不会被误判成语言变体
 _OTHER_LANG_CODES = {
     "ar", "az", "be", "bg", "bn", "ca", "cs", "da", "de", "el", "es", "et", "eu",
-    "fa", "fi", "fr", "gl", "he", "hi", "hr", "hu", "hy", "id", "is", "it", "ja",
+    "fa", "fi", "fr", "gl", "he", "hi", "hd", "hr", "hu", "hy", "id", "is", "it", "ja",
     "jp", "ka", "kk", "km", "kn", "ko", "kr", "ky", "lo", "lt", "lv", "mk", "ml",
     "mn", "mr", "ms", "my", "ne", "nl", "no", "pa", "pl", "ps", "pt", "ro", "ru",
     "si", "sk", "sl", "sq", "sr", "sv", "sw", "ta", "te", "th", "tl", "tr", "ua",
     "uk", "ur", "uz", "vi",
+    # 区域双码（README.pt-BR.md / ja-JP / ko-KR 等，压缩后首码对应主语言）
+    "ptbr", "jajp", "kokr", "enus", "ruru", "eses", "trtr", "nlnl", "frfr", "idid", "dede",
 }
 _VARIANT_NAME_RE = re.compile(r"^readme[._-]([a-z0-9._-]+)\.(?:md|markdown|mdx)$", re.I)
 # 单项目变体探测的并发度与语言数上限（大型 i18n 仓库实测最多 40+ 种语言，
