@@ -2784,7 +2784,7 @@ a:hover {
   font-family: var(--mono);
 }
 
-/* 「关于」模型中转站推荐：行内名称 + 注册链接 + Base URL 一键复制 */
+/* 「模型中转站」选项卡：整行可点击跳转 */
 .model-source-list {
   display: flex;
   flex-direction: column;
@@ -2794,32 +2794,26 @@ a:hover {
 .model-source-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap;
-}
-.model-source-name {
-  font-size: 13px;
-  color: var(--text);
-  font-weight: 600;
-  flex-shrink: 0;
-  min-width: 130px;
-}
-.model-source-url {
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--text-dim);
+  padding: 10px 12px;
   background: var(--bg-tint);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 3px 10px;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  border-radius: 10px;
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s;
 }
-.model-source-url:hover {
-  color: var(--accent);
+.model-source-row:hover {
   border-color: var(--accent);
+  background: var(--accent-weak);
 }
-.model-source-url:active {
-  color: var(--ok);
-  border-color: var(--ok);
+.model-source-name {
+  font-size: 13.5px;
+  color: var(--text);
+  font-weight: 600;
+}
+.model-source-open {
+  font-size: 12.5px;
+  color: var(--accent);
+  white-space: nowrap;
 }

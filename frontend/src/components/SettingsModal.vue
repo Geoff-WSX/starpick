@@ -16,8 +16,8 @@ const info = ref<SettingsState | null>(null)
 const tokenInput = ref('')
 const savedHint = ref('')
 
-// 选项卡：tab=「配置」（Token+限流）/「about」=「关于」
-const tab = ref<'tab' | 'about'>('tab')
+// 选项卡：tab=「配置」（Token+限流）/「about」=「关于」/「models」=「模型中转站推荐」
+const tab = ref<'tab' | 'about' | 'models'>('tab')
 
 // 「关于」：手动检查更新进行中标志 / 监听错误
 const checking = ref(false)
@@ -118,24 +118,15 @@ const repoHost = computed(() => {
   try { return new URL(info.value?.repo_url ?? '').hostname + new URL(info.value?.repo_url ?? '').pathname } catch { return info.value?.repo_url ?? '' }
 })
 
-// ---- 模型中转站推荐（「关于」页底部）：注册跳转 + Base URL 一键复制 ----
+// ---- 模型中转站推荐（独立选项卡）：点击链接直接跳转（桌面壳走系统浏览器，网页开新标签） ----
 interface ModelSourceLink {
   label: string
   signupUrl: string
-  baseUrl: string
 }
 const MODEL_SOURCE_LINKS: ModelSourceLink[] = [
-  { label: '芯谷 AI（国内模型）', signupUrl: 'https://api.xingu-ai.com/sign-up?aff=iC5W', baseUrl: 'https://api.xingu-ai.com' },
-  { label: '芯谷 AI（国外模型）', signupUrl: 'https://www.xinguhub.com/sign-up?aff=lyKd', baseUrl: 'https://api.xinguhub.com' },
+  { label: '芯谷 AI（国内模型）', signupUrl: 'https://api.xingu-ai.com/sign-up?aff=iC5W' },
+  { label: '芯谷 AI（国外模型）', signupUrl: 'https://www.xinguhub.com/sign-up?aff=lyKd' },
 ]
-const copiedBaseUrl = ref('')
-async function copyBaseUrl(baseUrl: string) {
-  try {
-    await navigator.clipboard.writeText(baseUrl)
-    copiedBaseUrl.value = baseUrl
-    setTimeout(() => { if (copiedBaseUrl.value === baseUrl) copiedBaseUrl.value = '' }, 2000)
-  } catch { /* 剪贴板不可用时静默 */ }
-}
 
 function close() {
   emit('close')
@@ -170,6 +161,12 @@ function close() {
             :aria-selected="tab === 'about'"
             @click="tab = 'about'"
           >关于</button>
+          <button
+            class="settings-tab" role="tab"
+            :class="{ active: tab === 'models' }"
+            :aria-selected="tab === 'models'"
+            @click="tab = 'models'"
+          >模型中转站</button>
         </div>
 
         <div v-show="tab === 'tab'" class="settings-body">
@@ -257,28 +254,25 @@ function close() {
             <div v-if="checkError" class="settings-hint">{{ checkError }}</div>
             <p class="settings-desc">应用每 6 小时自动检查一次新版本；仓库地址可随时查看源码与发布说明。</p>
           </div>
+        </div>
 
-          <!-- 模型中转站推荐：注册开通 + Base URL 一键复制（来源 prompt-gen 同款清单） -->
+        <div v-show="tab === 'models'" class="settings-body">
+          <!-- 模型中转站推荐：点击直接跳转注册/开通页 -->
           <div class="settings-group">
             <div class="settings-title"><span>模型中转站推荐</span></div>
             <div class="model-source-list">
-              <div v-for="src in MODEL_SOURCE_LINKS" :key="src.label" class="model-source-row">
+              <a
+                v-for="src in MODEL_SOURCE_LINKS"
+                :key="src.label"
+                class="model-source-row"
+                :href="src.signupUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                @click.prevent="openExternal(src.signupUrl)"
+              >
                 <span class="model-source-name">{{ src.label }}</span>
-                <a
-                  class="settings-link"
-                  :href="src.signupUrl"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >注册开通 ↗</a>
-                <button
-                  type="button"
-                  class="model-source-url"
-                  :title="`复制 ${src.baseUrl}`"
-                  @click="copyBaseUrl(src.baseUrl)"
-                >
-                  {{ copiedBaseUrl === src.baseUrl ? '已复制 ✓' : src.baseUrl }}
-                </button>
-              </div>
+                <span class="model-source-open">前往开通 ↗</span>
+              </a>
             </div>
             <p class="settings-desc">中转站用于获取大模型 API 密钥与接口地址（OpenAI 兼容格式）；列表仅供参考，请自行判断平台可靠性。</p>
           </div>
