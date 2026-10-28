@@ -51,8 +51,8 @@ README、图片、下载直链自动走国内镜像加速（gh-proxy.com / ghpro
 
 | 平台 | 下载文件 | 说明 |
 |------|----------|------|
-| Windows 10/11 (x64) | `StarPick-1.1-setup.exe` | 双击安装，Per-user 无需管理员 |
-| macOS (Apple Silicon, 11+) | `StarPick-1.1-arm64.dmg` | 拖入 Applications |
+| Windows 10/11 (x64) | `StarPick-1.2-setup.exe` | 双击安装，Per-user 无需管理员 |
+| macOS (Apple Silicon, 11+) | `StarPick-1.2-arm64.dmg` | 拖入 Applications |
 
 - **数据与日志**：macOS `~/Library/Application Support/StarPick/`；Windows `%APPDATA%\StarPick\`。卸载不删数据
 - **升级**：设置 → 关于 →「立即检查」，有新版本自动提示（每 6 小时检查一次）；原地升级数据保留
