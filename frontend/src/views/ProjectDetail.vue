@@ -249,7 +249,9 @@ function resolveReadme(
     return m.replace(`src="${src}"`, `src="${newSrc}"`)
   })
   // 链接：语言变体（含子目录/绝对链接写法）→ 站内语言切换；其余相对路径 → GitHub blob 页
-  md = md.replace(/\[([^\]]*)\]\(([^)]+)\)/g, (m, text: string, href: string) => {
+  // 文本允许嵌套图片（徽章式 [![xx](badge)](path)）——旧正则 [^\]]* 会把嵌套的 ]( 截断，
+  // 语言链接被误当普通链接 → 点击跳相对路由变空白页（2026-10-28 定位）
+  md = md.replace(/\[((?:[^\[\]]|\[[^\]]*\])*)\]\(([^)]+)\)/g, (m, text: string, href: string) => {
     if (href.startsWith('#')) return m
     const p = repoRelativePath(href, fullName, baseDir)
     if (!p) return m
