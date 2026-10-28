@@ -633,6 +633,19 @@ def list_rounds(limit: int = Query(default=30, ge=1, le=200)) -> dict[str, Any]:
 def trigger_run(payload: RunRequest = RunRequest()) -> RunOut:
     if state.collector is None:
         raise HTTPException(status_code=503, detail="服务尚未就绪")
+    # 预热进度快照：线程刚启动时 collect_once 内部的 progress.start 尚未执行，
+    # 前端首次 pollOnce 会读到 running=false 而停止轮询（采集中心进度面板不出现，
+    # 重开弹窗才显示）。先把 running 置 true，线程内 progress.start 会再覆盖一次。
+    # 已有 running 轮次时不预热：collect_once 会走 skipped 分支（不碰 progress），
+    # 预热会让进度面板假性卡在"进行中"。
+    if not state.collector.is_running():
+        if payload.categories:
+            total = len(payload.categories)
+        else:
+            total = len(state.cfg.categories) if state.cfg else 0
+        state.collector.progress.start(
+            datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"), total
+        )
     threading.Thread(target=_collect_job, args=(payload,), kwargs={"source": "manual"}, daemon=True).start()
     return RunOut(status="accepted", reason="采集已触发，防重入锁会自动拦截并发轮次")
 
@@ -955,6 +968,11 @@ def run_updates(category: list[str] | None = Query(default=None, description="�
     if state.collector.is_update_running():
         return {"status": "skipped", "reason": "已有更新检查运行中"}
     cats = [c for c in (category or []) if c]
+    # 预热进度快照（同 trigger_run）：线程内 check_updates 的 start 稍后才执行，
+    # 前端首轮 /api/updates/status 若读到 running=false 会停轮询（进度面板不出现）
+    state.collector.update_progress.start(
+        datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    )
     threading.Thread(
         target=lambda: state.collector.check_updates(limit=None, categories=cats or None), daemon=True,
         name="updates-full",
