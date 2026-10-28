@@ -121,6 +121,9 @@ packaging/               # 桌面打包：spec/双平台构建脚本/Inno 配置
 - **入库取并集**：`db._merge_variant_jsons` 让同语言以新内容为准、库内已有而本轮没采到的语言保留。镜像会偶发连接重置，**不要**把这里改成整列覆盖，否则一次抖动就丢内容。单一语言正文截断 `_VARIANT_MAX_CHARS=400_000`。
 - **补齐与重探**：启动时 `Collector.backfill_variants()` 跑两类——`list_projects_missing_all_variants()`（`readme_variants=''`，迁移上线前的存量）与 `list_projects_retry_variants(cutoff)`（超过 `_VARIANT_RETRY_DAYS=30` 天没探过，全库重扫一遍兜镜像抖动和上游新增语种）。探到就盖 `ml_variants_at`、失败留空下次重试。
 - **前端**：README 里的语言切换链接由 `ProjectDetail.vue` 渲染成 `data-lang`/`data-variant` 的内链（事件委托在 `onReadmeClick`），**库内有内容就直接切（零请求）**，没有才调 `GET /api/projects/{id}/readme-variant` 按需抓（返回 `truncated` 标记）。`variantLang()` 是后端 `variant_lang()` 的镜像表，**两张表要一起改**。
+- **语言切换链接三种形态都要覆盖（2026-10-28 三次踩坑）**：① Markdown `[文字](path)`；② **徽章嵌套** `[![xx](badge)](path)`（旧正则 `[^\]]*` 遇嵌套 `](` 截断，须用 `\[((?:[^\[\]]|\[[^\]]*\])*)\]`）；③ **HTML `<a href>`**（transformers 等）。三种都必须在 `resolveReadme` 转成 `data-lang` 内链，否则点击跳相对路由 `/project/i18n/...` 变空白页。标签文本要清洗（徽章/HTML 标签剥成纯文字）。
+- **语言码表要含区域双码**：`README.pt-BR.md`→`ptbr`、`ja-JP`→`jajp`、`en-US`→`enus` 及非标准码（`hd` 印地语）必须进 `OTHER_LANG_CODES`，否则识别不了 → 点击跳原页面。
+- **详情页默认中文**：有 `readme_zh` 的项目进入详情默认选「中文」tab（`readmeLangs` watch 中 `!userPickedLang && readmeLang==='default' && 有zh` 才切）；用户手动切换后 `userPickedLang=true` 尊重选择，重进页面恢复默认中文。
 - 现状量级（2026-10 全库）：1425 个有 README 的项目里 71 个声明了中/英之外的语言，366 个语言版本入库、JSON 共约 5.5 MB。
 
 ## 配置与密钥
