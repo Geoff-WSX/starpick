@@ -14,7 +14,7 @@ GitHub 公开项目手动发现与下载引导工具：用户在采集中心手�
 # 一键启动（自动建 backend/.venv、装依赖、构建前端、开浏览器）
 ./start.sh                      # 服务地址 http://127.0.0.1:8000，停止用 pkill -f 'uvicorn app.main:app'
 
-# 后端测试（180 项，2026-10-28 实测全绿；必须用 venv 里的 python）
+# 后端测试（181 项，2026-10-28 实测全绿；必须用 venv 里的 python）
 cd backend && .venv/bin/python -m pytest tests -q
 cd backend && .venv/bin/python -m pytest tests/test_collector.py -q   # 单文件更快迭代
 
@@ -53,7 +53,7 @@ backend/
 │   ├── desktop.py       # 桌面壳：pywebview 窗口 + 程序化 uvicorn
 │   ├── paths.py         # 数据/资源路径层（冻结/开发双模式）
 │   └── picker.py        # 每日精选
-└── tests/               # pytest 单元/契约测试（180 项）
+└── tests/               # pytest 单元/契约测试（181 项）
 frontend/src/
 ├── views/               # ProjectList（榜单+采集中心入口）、ProjectDetail（详情）
 ├── components/          # AppHeader/BaseSelect/CollectModal/CategoryCleanupModal/DownloadPicker/FavoritesModal/RoundsModal/SettingsModal/UpdatesModal/ProjectCard
@@ -94,14 +94,16 @@ packaging/               # 桌面打包：spec/双平台构建脚本/Inno 配置
 - 后端 `search_projects(platform=...)` 用 **带引号 LIKE `%"Windows"%`** 精确匹配 platforms JSON 数组——裸 LIKE 会让 Web 命中 Windows，测试锁定了该行为。
 - 语言组「中文」是**中文友好口径**（`zh=1`，含简介英文但中文友好的项目，约 430 个），不是简介语言判定；「英文」才是 `lang=en`。组内严格单选（`isLangActive`）。
 
-## 设置「关于」分组与应用自更新（2026-10-20 落地）
+## 设置「关于」分组与应用自更新（2026-10-20 落地，2026-10-28 扩展）
 
-- `SettingsModal.vue` 是**选项卡**结构（`tab`/`about` 两页，`.settings-tabs/.settings-tab` 样式在 style.css）：配置页=Token+限流，关于页=版本/检查更新/项目地址。新增设置项先进对应选项卡。
-- `GET /api/settings` 返回 `version` / `repo_url` / `app_update`；`POST /api/app/update-check` 手动触发（后台线程 + `app_update_checking` 防重入）。结果缓存在 `state.app_update`（内存态，不入库），status 取值 `none/up_to_date/newer/unknown`。
+- `SettingsModal.vue` 是**选项卡**结构（`tab`/`about`/`models` 三页，`.settings-tabs/.settings-tab` 样式在 style.css）：配置页=Token+限流，关于页=版本/检查更新/一键更新，模型中转站页=推荐列表（芯谷 AI 国内/国外，注册跳转 + 整行可点，数据硬编码前端常量 `MODEL_SOURCE_LINKS`）。新增设置项先进对应选项卡。
+- `GET /api/settings` 返回 `version` / `repo_url` / `app_update` / `deployment`（`desktop`=打包壳 / `web`=源码网页服务，按 `paths.is_frozen()` 判定）；`POST /api/app/update-check` 手动触发（后台线程 + `app_update_checking` 防重入）。结果缓存在 `state.app_update`（内存态，不入库），status 取值 `none/up_to_date/newer/unknown`。
+- **部署形态区分更新引导**：`deployment=web` 时「发现新版本」不显示下载安装包链接，只提示 git pull 重启；`deployment=desktop` 时显示「下载并自动更新」+「手动下载」降级链接。
+- **Windows 一键自动更新（2026-10-28）**：`POST /api/app/update-download`（仅 frozen+win32 可用，返回最新 setup.exe 直链，走独立 requests 不走采集限流器）→ 前端调桌面壳桥 `pywebview.api.update_and_exit(url, name)` → `desktop.py` 下载到临时目录 → 停内嵌服务（`_stop_uvicorn`）→ `subprocess` 以 `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART` 启动安装器 → 进程退出。installer.iss 已加 `CloseApplications=yes` 支持静默覆盖。**当前线上 Latest=v1.1 仍为旧安装器配置，一键更新自下版起生效。**
 - `GITHUB_REPO = "Geoff-WSX/starpick"` 常量在 `backend/app/main.py`（设置页「关于」与更新检查共用）；仓库换了要同步改。
 - **检查更新绝不能走 `GithubClient`/`get_latest_release`**：那个走采集限流器（匿名 60 次/小时），全量扫荡期间会排队数分钟卡死手动检查——必须保持 `_check_app_update()` 的独立 requests 请求（超时 8s，任何失败归 `unknown`）。仓库公开后匿名即可查到 Release；当前 token（`github_pat_` fine-grained）反而读不到私有仓库 Release 的历史遗留问题，公开后无所谓。
 - 版本比较用 `_parse_tag_version`（v 前缀剥离 + 数字元组比较；非语义化 tag → `unknown` 并原样显示 latest_tag）。改 `APP_VERSION` 时注意：本地版本低于线上 latest Release 时，旧版安装包会真弹「发现新版本」。
-- 对应测试 `backend/tests/test_app_update.py`（12 项：fake requests 模块自带异常体系给 `_check_app_update` 的 except 捕获，勿换成真 requests 异常类）。
+- 对应测试 `backend/tests/test_app_update.py`（13 项：fake requests 模块自带异常体系给 `_check_app_update` 的 except 捕获，勿换成真 requests 异常类）。
 
 ## 数据库迁移规则（重要）
 
@@ -143,6 +145,8 @@ packaging/               # 桌面打包：spec/双平台构建脚本/Inno 配置
 - **详情接口响应会随语言数变大**：`/api/projects/{id}` 会带上全部语言正文（supabase 41 种语言约 600 KB 未压缩；列表接口走 `_LIST_COLS` 不返回这些大字段）。改详情接口时别顺手把语言字段塞进列表接口。
 - **浏览器自动化点长详情页会超时**：README 很长时 Playwright 的 `click()` 常超时（即使 `force: true`），改用 `locator.evaluate((el) => el.click())` 派发真实 DOM 点击触发 Vue 事件委托；页面里 `.markdown-body` 有多个（release 说明 + README），README 是最后一个。
 - **会话顶部注入的约束可能来自另一个项目**：`~/AGENTS.md` 写的是「街头美食社交平台」（React + Ant Design + Express + Prisma + MySQL），会被当作 workspace 约束注入到本仓库的会话里。那套规则（如「后端只允许改 backend/src/」）与本仓库布局不符，**一律以本文件为准**。
+- **push 失败先查代理**：`git push` 报 `SSL_ERROR_SYSCALL`/`Failed to connect to 127.0.0.1 port 7890` 时，先 `lsof -iTCP:7890 -sTCP:LISTEN` 确认代理进程、`curl -x http://127.0.0.1:7890 https://api.github.com` 探活；代理挂了就等恢复再推（提交在本地不丢），别反复重试或改代理配置。直连 `api.github.com` 始终可用，可作远端状态核验。
+- **浏览器自动化点击失效**：页面内 `evaluate("el.click()")` 派发的 DOM click 偶发不触发 Vue 事件（弹窗按钮尤其），改用 Playwright 原生 `getByRole(...).click()`；弹窗里「设置」按钮只在首页 AppHeader 存在，详情页没有。
 - **仓库顶层不该再出现 Windows 专有内容**：start.bat 已于 2026-10-28 删除；立项文档移入 docs/。品牌统一为 **STARPICK/starpick**，旧名「GitHub 好项目发现器」「拾星」已全仓清除，不要再引入。
 
 ## 双机分叉约定（见 FORK.md）
