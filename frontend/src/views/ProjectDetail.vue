@@ -108,7 +108,7 @@ async function load() {
     loadSimilar()
     loadOwnerProjects()
   } catch (e) {
-    error.value = e instanceof Error ? e.message : '加载项目失败'
+    error.value = e instanceof Error ? e.message : t('detail_load_fail')
   } finally {
     loading.value = false
   }
@@ -207,7 +207,7 @@ const readmeLangs = computed(() => {
     // 点击时才抓的版本标注「按需」，库里已采的直接用语言名
     const raw = extraVariant.value.label
     const label = extraVariant.value.source === 'fetch' && opts.some((o) => o.label === raw)
-      ? `${raw}（按需）`
+      ? `${raw}${t('detail_extra_ondemand')}`
       : raw
     opts.push({ key: 'extra', label })
   }
@@ -366,7 +366,7 @@ async function loadExtraVariant(path: string, label: string) {
   } catch {
     extraErrorPath.value = path
     extraErrorLabel.value = label
-    extraError.value = `「${label}」版本暂时无法通过镜像获取（可能已改名或删除）`
+    extraError.value = t('detail_variant_fetch_fail').replace('{label}', label)
   } finally {
     extraLoading.value = ''
   }
@@ -443,7 +443,7 @@ const isFav = ref(false)
 const favGroup = ref('')
 const favBusy = ref(false)
 
-const favoriteGroupLabel = computed(() => favGroup.value || '未分组')
+const favoriteGroupLabel = computed(() => favGroup.value || t('detail_ungrouped'))
 
 async function toggleFav() {
   if (favBusy.value) return
@@ -456,7 +456,7 @@ async function toggleFav() {
     } else {
       await addFavorite(projectId.value)
       isFav.value = true
-      favGroup.value = detail.value?.category || '未分组'
+      favGroup.value = detail.value?.category || t('detail_ungrouped')
     }
   } catch (e) {
     // 静默失败：下次操作重试
@@ -542,7 +542,7 @@ function back() {
   <div class="container">
     <!-- 顶栏：图形 logo + 项目名（用短名 name，owner 前缀只在加载失败时兜底） -->
     <header class="topbar">
-      <button class="btn ghost back-btn" @click="back">← 返回列表</button>
+      <button class="btn ghost back-btn" @click="back">{{ t('detail_back') }}</button>
       <h1 class="detail-title">
         <svg class="detail-logo" viewBox="0 0 48 48" aria-hidden="true">
           <path d="M7 31a17 17 0 0 0 34 0" fill="none" stroke="var(--text)" stroke-width="4.5" stroke-linecap="round" />
@@ -553,13 +553,13 @@ function back() {
       <span v-if="detail" class="stars">★ {{ formatStars(detail.stars) }}</span>
     </header>
 
-    <div v-if="loading" class="empty">加载中…</div>
+    <div v-if="loading" class="empty">{{ t('detail_loading') }}</div>
     <div v-else-if="error" class="error-banner">{{ error }}</div>
 
     <template v-else-if="detail">
       <!-- 简介 -->
       <section class="panel">
-        <p class="desc-zh">{{ detail.description || '（无简介）' }}</p>
+        <p class="desc-zh">{{ detail.description || t('detail_no_desc') }}</p>
 
         <div class="meta-row">
           <span class="tag">{{ t('cat_' + detail.category) }}</span>
@@ -567,15 +567,15 @@ function back() {
             v-for="c in extraCategories"
             :key="c"
             class="tag extra-cat"
-            :title="`跨界项目，同时属于「${c}」`"
+            :title="t('detail_extra_cat_tip').replace('{c}', c)"
           >{{ t('cat_' + c) }}</span>
           <span v-if="detail.lang" class="tag" :class="detail.lang === 'zh' ? 'lang-zh' : 'lang-en'">
             {{ detail.lang === 'zh' ? t('filter_zh') : t('filter_en') }}
           </span>
           <span v-if="detail.language" class="tag lang">{{ detail.language }}</span>
-          <span v-if="detail.zh_friendly" class="tag zh" title="官方提供中文文档或说明（官网/仓库），对中文用户友好">中文友好</span>
+          <span v-if="detail.zh_friendly" class="tag zh" :title="t('detail_zh_friendly_tip')">中文友好</span>
           <span v-for="p in detail.platforms" :key="p" class="tag platform">{{ p }}</span>
-          <span class="tag">更新 {{ formatDate(detail.pushed_at) }}</span>
+          <span class="tag">{{ t('detail_update').replace('{date}', formatDate(detail.pushed_at)) }}</span>
         </div>
 
         <div v-if="detail.system_requirements.length" class="meta-row">
@@ -588,41 +588,41 @@ function back() {
             class="btn"
             :class="isFav ? 'fav-on' : 'ghost'"
             :disabled="favBusy"
-            :title="isFav ? `已归入「${favoriteGroupLabel}」分组` : '收藏后自动按项目主分类归入同组'"
+            :title="isFav ? t('detail_fav_in_group').replace('{group}', favoriteGroupLabel) : t('detail_fav_tip')"
             @click="toggleFav"
           >
-            {{ isFav ? '★ 已收藏' : '☆ 收藏' }}
+            {{ isFav ? t('detail_fav_added') : t('detail_fav') }}
           </button>
           <template v-if="detail.assets.length > 0">
             <div v-if="matchedAssets.length" class="dl-primary">
               <button class="btn dl" @click="downloadBest(matchedAssets[0].url)">
-                下载 {{ currentOS }} 版{{ mirrorUrl(matchedAssets[0].url) ? '（镜像加速）' : '' }}
+                {{ t('detail_dl_os').replace('{os}', currentOS) }}{{ mirrorUrl(matchedAssets[0].url) ? t('detail_dl_mirror') : '' }}
               </button>
-              <button v-if="mirrorUrl(matchedAssets[0].url)" class="btn ghost small" :title="matchedAssets[0].url" @click="external(matchedAssets[0].url)">原地址</button>
+              <button v-if="mirrorUrl(matchedAssets[0].url)" class="btn ghost small" :title="matchedAssets[0].url" @click="external(matchedAssets[0].url)">{{ t('detail_orig') }}</button>
             </div>
-            <button class="btn prompt" title="查看安装提示词全文，复制给豆包等能操作电脑的 AI 助手，让它帮你安装" @click="openInstallPrompt">复制安装提示词</button>
+            <button class="btn prompt" :title="t('detail_prompt_title_tip')" @click="openInstallPrompt">{{ t('detail_copy_prompt') }}</button>
           </template>
           <template v-else-if="!detail.assets_probed">
-            <button class="btn dl" @click="openInstallPrompt">复制安装提示词</button>
-            <span class="probe-chip" title="正在后台探测 GitHub release，完成后这里会出现下载按钮；无 Token 时限速约 60 个/小时">安装包检测中…</span>
+            <button class="btn dl" @click="openInstallPrompt">{{ t('detail_copy_prompt') }}</button>
+            <span class="probe-chip" :title="t('detail_detecting_tip')">{{ t('detail_detecting') }}</span>
           </template>
           <button v-else class="btn dl" @click="openInstallPrompt">复制安装提示词</button>
           <span class="actions-spacer"></span>
-          <button class="btn ghost" title="需可访问 GitHub 的网络；打不开时可直接使用下方站内 README" @click="external(detail.html_url)">
-            {{ detail.assets.length > 0 ? 'GitHub 发布页 ↗' : 'GitHub ↗' }}
+          <button class="btn ghost" :title="t('detail_github_net_tip')" @click="external(detail.html_url)">
+            {{ detail.assets.length > 0 ? t('detail_github_release') : t('detail_github') }}
           </button>
         </div>
         <!-- 安装提示词的说明独占一行，不再插在按钮之间 -->
         <p class="actions-hint">
-          <template v-if="detail.assets.length === 0 && !detail.assets_probed">安装包还在检测中？</template>
-          <template v-else-if="detail.assets.length === 0">没有现成安装包？</template>
-          复制安装提示词发给豆包等 AI 助手（选「本地电脑模式」），它会帮你下载、装好并运行
+          <template v-if="detail.assets.length === 0 && !detail.assets_probed">{{ t('detail_detecting_q') }}</template>
+          <template v-else-if="detail.assets.length === 0">{{ t('detail_no_pkg_q') }}</template>
+          {{ t('detail_prompt_desc') }}
         </p>
         <p v-if="matchedAssets.length" class="actions-hint">{{ matchedAssets[0].name }}（{{ formatSize(matchedAssets[0].size) }}） · 点击下方列表文件名也可直接下载</p>
 
         <!-- 全部版本列表 -->
         <div v-if="detail.assets.length > 0" class="asset-list">
-          <div class="asset-head">全部版本（{{ detail.assets.length }} 个安装包）</div>
+          <div class="asset-head">{{ t('detail_all_versions').replace('{n}', String(detail.assets.length)) }}</div>
           <div
             v-for="a in detail.assets"
             :key="a.url"
@@ -631,23 +631,23 @@ function back() {
             @click="downloadBest(a.url)"
           >
             <span class="asset-platform" :class="{ match: a.platform === currentOS }">
-              {{ a.platform || '其他' }}
-              <span v-if="a.platform === currentOS" class="pick-tag">当前系统</span>
+              {{ a.platform || t('detail_platform_other') }}
+              <span v-if="a.platform === currentOS" class="pick-tag">{{ t('detail_current_os') }}</span>
             </span>
             <span class="asset-name" :title="a.name">{{ a.name }}</span>
             <span class="asset-size">{{ formatSize(a.size) }}</span>
             <button class="btn dl small" @click.stop="downloadBest(a.url)">
-              {{ mirrorUrl(a.url) ? '加速下载' : '下载' }}
+              {{ mirrorUrl(a.url) ? t('detail_dl_mirror_btn') : t('detail_dl_btn') }}
             </button>
-            <button v-if="mirrorUrl(a.url)" class="btn ghost small" :title="a.url" @click.stop="external(a.url)">原地址</button>
+            <button v-if="mirrorUrl(a.url)" class="btn ghost small" :title="a.url" @click.stop="external(a.url)">{{ t('detail_orig') }}</button>
           </div>
-          <div class="hint">点击文件名可直接下载；文件名可判断架构（x64 / arm64 等）。</div>
+          <div class="hint">{{ t('detail_asset_hint') }}</div>
         </div>
 
         <!-- 健康度曲线（更新检查快照） -->
         <div v-if="healthSnaps.length >= 2" class="health-block">
           <div class="health-head">
-            <span>健康度（Star 曲线）</span>
+            <span>{{ t('detail_health') }}</span>
             <span class="hint">{{ healthRangeLabel }} · {{ healthSnaps.length }} 个检查快照</span>
           </div>
           <svg class="health-svg" viewBox="0 0 320 64" preserveAspectRatio="none" role="img" aria-label="Star 变化曲线">
@@ -670,7 +670,7 @@ function back() {
       <!-- 最新版本说明 -->
       <section v-if="releaseNotesHtml" class="panel readme-panel">
         <div class="readme-head">
-          <span>最新版本说明</span>
+          <span>{{ t('detail_latest_notes') }}</span>
         </div>
         <div class="markdown-body" v-html="releaseNotesHtml"></div>
       </section>
@@ -689,23 +689,23 @@ function back() {
             >{{ o.label }}</button>
           </div>
         </div>
-        <div v-if="extraLoading" class="variant-hint">正在从镜像抓取「{{ extraLoading }}」版本…</div>
+        <div v-if="extraLoading" class="variant-hint">{{ t('detail_variant_fetching').replace('{label}', extraLoading) }}</div>
         <div v-else-if="extraError" class="variant-hint error">
           {{ extraError }}
           <button class="btn small" :disabled="!!extraLoading" @click="retryExtraVariant">重试</button>
           <a v-if="extraFallbackUrl" :href="extraFallbackUrl" target="_blank" rel="noopener" @click.prevent="openExternal(extraFallbackUrl)">在 GitHub 打开</a>
         </div>
         <div v-if="readmeHtml" class="markdown-body" v-html="readmeHtml" @click="onReadmeClick"></div>
-        <div v-else-if="readmeLang === 'zh'" class="empty">该项目没有自带中文 README。</div>
-        <div v-else-if="readmeLang === 'extra'" class="empty">该语言版本内容为空。</div>
-        <div v-else class="empty">该项目没有 README 内容。</div>
+        <div v-else-if="readmeLang === 'zh'" class="empty">{{ t('detail_no_zh_readme') }}</div>
+        <div v-else-if="readmeLang === 'extra'" class="empty">{{ t('detail_extra_empty') }}</div>
+        <div v-else class="empty">{{ t('detail_no_readme') }}</div>
       </section>
 
       <!-- 相似项目推荐 -->
       <section v-if="similar.length > 0" class="panel">
         <div class="readme-head">
-          <span>相似项目推荐</span>
-          <span class="hint">同「{{ t('cat_' + (detail?.category || '')) }}」分类 · star 数量级相近</span>
+          <span>{{ t('detail_similar') }}</span>
+          <span class="hint">{{ t('detail_similar_hint').replace('{cat}', t('cat_' + (detail?.category || ''))) }}</span>
         </div>
         <div class="similar-grid">
           <router-link
@@ -715,9 +715,9 @@ function back() {
             class="similar-card"
           >
             <div class="similar-name">{{ s.name }}</div>
-            <div class="similar-desc">{{ s.description || '（无简介）' }}</div>
+            <div class="similar-desc">{{ s.description || t('detail_no_desc') }}</div>
             <div class="similar-meta">
-              <span class="tag">{{ s.category }}</span>
+              <span class="tag">{{ t('cat_' + s.category) }}</span>
               <span v-if="s.language" class="tag lang">{{ s.language }}</span>
               <span class="stars">★ {{ formatStars(s.stars) }}</span>
             </div>
@@ -728,8 +728,8 @@ function back() {
       <!-- 同作者其它项目 -->
       <section v-if="ownerProjects.length > 0" class="panel">
         <div class="readme-head">
-          <span>同作者其它项目</span>
-          <span class="hint">来自 {{ detail?.owner }} 的其它收录</span>
+          <span>{{ t('detail_owner') }}</span>
+          <span class="hint">{{ t('detail_owner_hint').replace('{owner}', detail?.owner || '') }}</span>
         </div>
         <div class="similar-grid">
           <router-link
@@ -739,9 +739,9 @@ function back() {
             class="similar-card"
           >
             <div class="similar-name">{{ s.name }}</div>
-            <div class="similar-desc">{{ s.description || '（无简介）' }}</div>
+            <div class="similar-desc">{{ s.description || t('detail_no_desc') }}</div>
             <div class="similar-meta">
-              <span class="tag">{{ s.category }}</span>
+              <span class="tag">{{ t('cat_' + s.category) }}</span>
               <span v-if="s.language" class="tag lang">{{ s.language }}</span>
               <span class="stars">★ {{ formatStars(s.stars) }}</span>
             </div>
