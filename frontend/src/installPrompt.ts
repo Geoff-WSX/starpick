@@ -5,6 +5,8 @@
  */
 
 /** 拼提示词所需的最小项目信息（Project / ProjectDetail 都满足） */
+import { currentLang } from './composables/useI18n'
+
 export interface InstallPromptSource {
   name: string
   description: string
@@ -34,7 +36,57 @@ function pickMirrorExample(
   return { url: `${p.html_url}/releases`, label: '发布页', matched: false }
 }
 
+export function buildInstallPromptEn(p: InstallPromptSource, os: string): string {
+  const lines = [
+    'Please use "local computer mode" (or a mode where you can directly operate my computer) to install this open-source software for me, so it starts and runs normally.',
+    '',
+    'Software info:',
+    `- Name: ${p.name || '(see repo URL)'}`,
+  ]
+  const desc = oneLine(p.description || '')
+  if (desc) lines.push(`- Description: ${desc}`)
+  lines.push(`- Repo URL: ${p.html_url}`)
+  const reqs = (p.system_requirements || []).filter(Boolean).slice(0, 4).map((r) => oneLine(r, 30))
+  if (reqs.length) lines.push(`- System requirements: ${reqs.join('; ')}`)
+  lines.push('')
+  const sys = ['Windows', 'macOS', 'Linux'].includes(os) ? os : ''
+  lines.push(sys ? `My OS: ${sys} (if your judgment differs, confirm with me first)` : 'My OS: ask me to confirm before starting')
+
+  const prefixes = (p.mirror_prefixes || []).filter((x) => x.startsWith('https://')).slice(0, 3)
+  if (prefixes.length) {
+    const ex = pickMirrorExample(p, sys)
+    lines.push(
+      '',
+      'GitHub access acceleration (important): I am in mainland China and direct access to GitHub often times out. Always prefer accelerated links for downloads, repo pages, README, and Release pages.',
+      `- Pattern: mirror prefix + full original link. Example (${ex.matched && sys ? `${sys} installer` : ex.label}):`,
+      `  Original: ${ex.url}`,
+      `  Accelerated: ${prefixes[0]}${ex.url}`,
+      `- Available prefixes (fall through if one fails): ${prefixes.join(', ')}`,
+      '- Accelerated links are just relays of official links; files still come from the official repo. For source archives: "prefix + repo URL + /archive/refs/heads/<default-branch>.zip".',
+    )
+  }
+
+  lines.push(
+    '',
+    'Please follow this order:',
+    '1. Read the repo README and Release page first; choose the simplest install path, preferring ready-made installers (.exe / .dmg / AppImage etc.).',
+    '2. Download only from the official repo/release page or the accelerated links above. Do not use installers or scripts from other sources.',
+    '3. If a runtime (Python / Node / Docker etc.) or source build is needed, follow the official docs and tell me what extra packages you installed.',
+    '4. Explain before each step; pause and ask my confirmation before requiring admin rights, changing system settings, or deleting files.',
+    '5. If the same approach fails twice, switch (prefix / installer / method) and paste the exact error instead of retrying.',
+    '6. If this is not actually directly installable software (e.g. a resource list or a service that needs deployment), tell me directly and give usage advice.',
+    '7. When done, tell me: how to launch it, where to open it later, and any system settings or environment variables you changed (if any).',
+    '',
+    'If you cannot operate my computer, give me step-by-step instructions with copyable commands, and I will run them myself.',
+  )
+  return lines.join('\n')
+}
+
 export function buildInstallPrompt(p: InstallPromptSource, os: string): string {
+  return currentLang.value === 'en' ? buildInstallPromptEn(p, os) : buildInstallPromptZh(p, os)
+}
+
+function buildInstallPromptZh(p: InstallPromptSource, os: string): string {
   const lines = [
     '请用「本地电脑模式」（或你能直接操作我电脑的模式）帮我在我的电脑上安装这个开源软件，目标是装好后能正常启动使用。',
     '',

@@ -606,7 +606,7 @@ function back() {
             <button class="btn dl" @click="openInstallPrompt">{{ t('detail_copy_prompt') }}</button>
             <span class="probe-chip" :title="t('detail_detecting_tip')">{{ t('detail_detecting') }}</span>
           </template>
-          <button v-else class="btn dl" @click="openInstallPrompt">复制安装提示词</button>
+          <button v-else class="btn dl" @click="openInstallPrompt">{{ t('detail_copy_prompt') }}</button>
           <span class="actions-spacer"></span>
           <button class="btn ghost" :title="t('detail_github_net_tip')" @click="external(detail.html_url)">
             {{ detail.assets.length > 0 ? t('detail_github_release') : t('detail_github') }}

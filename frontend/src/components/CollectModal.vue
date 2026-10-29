@@ -345,14 +345,14 @@ function fmtTimeShort(iso: string): string {
         <div class="param-item cat-multi">
           <span class="param-label">{{ t('collect_categories') }}</span>
           <div class="cat-chips">
-            <button class="chip" :class="{ active: collectCats.length === 0 }" @click="resetCats">全部</button>
+            <button class="chip" :class="{ active: collectCats.length === 0 }" @click="resetCats">{{ t('collect_all_cats') }}</button>
             <button
               v-for="c in allCategories"
               :key="c"
               class="chip"
               :class="{ active: collectCats.includes(c) }"
               @click="toggleCat(c)"
-            >{{ c }}</button>
+            >{{ t('cat_' + c) }}</button>
             <button
               class="chip custom-chip"
               :class="{ active: customMode }"
@@ -410,14 +410,14 @@ function fmtTimeShort(iso: string): string {
         <div class="param-item cat-multi">
           <span class="param-label">{{ t('collect_update_check_cats') }}</span>
           <div class="cat-chips">
-            <button class="chip" :class="{ active: updateCats.length === 0 }" @click="resetUpdateCats">全部</button>
+            <button class="chip" :class="{ active: updateCats.length === 0 }" @click="resetUpdateCats">{{ t('collect_update_check_all') }}</button>
             <button
               v-for="c in allCategories"
               :key="c"
               class="chip"
               :class="{ active: updateCats.includes(c) }"
               @click="toggleUpdateCat(c)"
-            >{{ c }}</button>
+            >{{ t('cat_' + c) }}</button>
           </div>
         </div>
         <span class="collect-hint">{{ t('collect_update_hint') }}</span>
