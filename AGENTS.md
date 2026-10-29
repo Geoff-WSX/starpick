@@ -32,7 +32,7 @@ cd frontend && npm run dev      # http://localhost:5173
 
 ## Git 与远端
 
-- 仓库 `https://github.com/Geoff-WSX/starpick`（分支 `main`，已公开）。**2026-10-24 版本重置：v1.0.0~v1.3.0 均为测试版，其 Release（含资产）与 tag 已全部删除，正式版从 v1.0 起步；v1.2（2026-10-28）已发布，当前 Latest=v1.2**；tag 触发 Windows CI 自动产 setup.exe 上 Release，macOS dmg 手动补传。Windows 分支不在同一仓库（见 FORK.md），不要往这个仓库里塞 Windows 专有内容（start.bat 已删）。
+- 仓库 `https://github.com/Geoff-WSX/starpick`（分支 `main`，已公开）。**2026-10-24 版本重置：v1.0.0~v1.3.0 均为测试版，其 Release（含资产）与 tag 已全部删除，正式版从 v1.0 起步；v1.3（2026-10-29）已发布，当前 Latest=v1.3**；tag 触发 Windows CI 自动产 setup.exe 上 Release，macOS dmg 手动补传。Windows 分支不在同一仓库（见 FORK.md），不要往这个仓库里塞 Windows 专有内容（start.bat 已删）。
 - **直连 `github.com` 会被墙，但 `api.github.com` 可以直连**——现象是 `gh` 建库/查 API 一切正常、`git push` 却超时（或报 HTTP2 framing error）。本仓库 `.git/config` 已写死 `http.proxy=http://127.0.0.1:7890` 与 `http.version=HTTP/1.1`，推送/拉取前确认本机代理在运行；凭据走 `credential.helper='!gh auth git-credential'`（Token 从 gh 钥匙串取，不落盘，不要改成把 Token 写进 URL）。
 - 永不提交：`history.db*`、`backend/data/`（备份目录）、`logs/`、`*.log*`、`.runtime_token`、`frontend/dist/`、`node_modules/`、`.venv/`、`*.tsbuildinfo`、编译产物 `frontend/vite.config.js` 与其 `.d.ts`。推前自查：`git ls-files | grep -Ei '\.env$|runtime_token|\.db|node_modules|dist/|\.log'` 应无输出。
 
@@ -93,6 +93,16 @@ packaging/               # 桌面打包：spec/双平台构建脚本/Inno 配置
 - 筛选区「平台」组：Windows/macOS/Linux/Android/iOS/Web/Docker，与分类平级可叠加，URL 参数 `platform`，再点同平台取消。
 - 后端 `search_projects(platform=...)` 用 **带引号 LIKE `%"Windows"%`** 精确匹配 platforms JSON 数组——裸 LIKE 会让 Web 命中 Windows，测试锁定了该行为。
 - 语言组「中文」是**中文友好口径**（`zh=1`，含简介英文但中文友好的项目，约 430 个），不是简介语言判定；「英文」才是 `lang=en`。组内严格单选（`isLangActive`）。
+
+## 界面国际化（2026-10-29 落地，v1.3 起）
+
+- **中英切换**：顶栏语言按钮（日夜按钮旁，显示目标语言「EN/中」），localStorage `starpick-lang` 记忆，`<html lang>` 同步。
+- **机制**：`useI18n` composable（`t()`/`currentLang`/`toggleLang`）+ `src/i18n/zh.ts`/`en.ts` 语言包。键缺失回退中文包；`cat_` 前缀键（分类名映射）无英文时回退中文原名（自定义分类）。
+- **分类映射**：数据层分类名是中文，界面用 `t('cat_' + c)`；自定义分类英文名来自 `/api/categories` 的 `custom_en`（取首个英文关键词），前端 `registerCustomCategoryEn` 动态注册。
+- **注意**：改语言包时 zh/en **必须同步**；追加键用 python 脚本（`s[:-1]+新键+\n}\n`）易产生双 `}`，追加后检查尾部；含换行的键用模板串。
+- **后端数据双语**：通知标题（新项目收录/有新版）、历史轮次 error（进程重启等）、系统要求前缀（内存/GPU等）都是后端存的中文数据——前端 `mapXxx()` 按已知文案映射，不要改后端存储格式。
+- **函数 label**：下拉选项（BaseSelect）label 可为 `string | (() => string)`，国际化用函数，显示处 `typeof l === 'function' ? l() : l`。
+- **安装提示词**：`installPrompt.ts` 按 `currentLang` 分派 `buildInstallPromptZh/En`，英文模式生成英文指令。
 
 ## 设置「关于」分组与应用自更新（2026-10-20 落地，2026-10-28 扩展）
 
