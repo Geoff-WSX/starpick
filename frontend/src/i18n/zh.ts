@@ -357,4 +357,7 @@ export default {
   card_update: '更新 {date}',
   card_fav_tip: '收藏到默认分组',
   card_fav_remove_tip: '取消收藏',
+  err_stale_round: '进程重启，旧运行轮次作废',
+  err_no_candidates: '本轮未搜索到任何候选（网络/限流导致）',
+  err_search_fail: '发现轮搜索失败: {msg}',
 }

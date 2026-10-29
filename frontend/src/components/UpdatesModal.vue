@@ -37,6 +37,11 @@ function statusLabel(s: string): string {
   return map[s] ? map[s]() : s
 }
 
+function mapError(e: string): string {
+  if (e === '进程重启，旧运行轮次作废') return t('err_stale_round')
+  return e
+}
+
 function updateScopeLabel(s: string): string {
   return s === 'full' ? t('updates_scope_full') : s === 'incremental' ? t('updates_scope_incremental') : s
 }
@@ -114,7 +119,7 @@ function close() {
               <td :class="{ 'err-text': Number(r.stats?.failed ?? 0) > 0 }">{{ r.stats?.failed ?? 0 }}</td>
               <td>{{ fmtDuration(Number(r.stats?.duration_sec) || 0) }}</td>
               <td class="dim note">
-                <span v-if="r.error" :title="r.error">{{ r.error.length > 60 ? r.error.slice(0, 60) + '…' : r.error }}</span>
+                <span v-if="r.error" :title="mapError(r.error)">{{ mapError(r.error).length > 60 ? mapError(r.error).slice(0, 60) + '…' : mapError(r.error) }}</span>
                 <span v-else>—</span>
               </td>
             </tr>

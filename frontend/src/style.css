@@ -1239,6 +1239,15 @@ a:hover {
   margin-bottom: 14px;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
+  /* 弹窗整体滚动时头部固定：贴住弹窗顶部（弹窗 padding-top 20px，滚动后需回顶） */
+  position: sticky;
+  top: -20px;
+  z-index: 5;
+  background: var(--bg-card);
+  margin-left: -22px;
+  margin-right: -22px;
+  padding-left: 22px;
+  padding-right: 22px;
 }
 .modal-head h2 {
   font-size: 17px;

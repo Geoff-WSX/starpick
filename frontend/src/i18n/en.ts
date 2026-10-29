@@ -357,4 +357,7 @@ Favorited projects are kept; the DB is auto-backed up before deletion.`,
   card_update: 'Updated {date}',
   card_fav_tip: 'Add to favorites',
   card_fav_remove_tip: 'Remove from favorites',
+  err_stale_round: 'Process restarted; the old running round was invalidated',
+  err_no_candidates: 'No candidates found this round (network/rate-limit)',
+  err_search_fail: 'Discovery search failed: {msg}',
 }

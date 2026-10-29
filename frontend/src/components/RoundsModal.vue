@@ -38,6 +38,14 @@ function statusLabel(s: string): string {
 }
 
 // 轮次来源标签：手动 / 定时发现轮 / 每日全量轮 / 启动补跑（旧数据无标记时视为手动）
+/** 历史轮次 error 是后端写入的数据（中文）；英文模式按已知文案映射 */
+function mapError(e: string): string {
+  if (e === '进程重启，旧运行轮次作废') return t('err_stale_round')
+  if (e.startsWith('本轮未搜索到任何候选')) return t('err_no_candidates')
+  if (e.startsWith('发现轮搜索失败')) return t('err_search_fail').replace('{msg}', e.slice('发现轮搜索失败: '.length))
+  return e
+}
+
 function sourceLabel(s: string | undefined): string {
   const map: Record<string, () => string> = {
     manual: () => t('rounds_src_manual'), scheduled: () => t('rounds_src_scheduled'), startup: () => t('rounds_src_startup'),
@@ -120,7 +128,7 @@ function close() {
               <td>{{ r.stats?.skipped ?? 0 }}</td>
               <td>{{ fmtDuration(r.stats?.duration_sec) }}</td>
               <td class="dim note">
-                <span v-if="r.error" :title="r.error">{{ r.error.length > 60 ? r.error.slice(0, 60) + '…' : r.error }}</span>
+                <span v-if="r.error" :title="mapError(r.error)">{{ mapError(r.error).length > 60 ? mapError(r.error).slice(0, 60) + '…' : mapError(r.error) }}</span>
                 <span v-else>—</span>
               </td>
             </tr>
