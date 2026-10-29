@@ -209,4 +209,9 @@ export default {
   fav_sort_time: '收藏时间',
   fav_sort_stars: 'Star 最多',
   fav_ungrouped: '未分组',
+  readme_default_zh: '中文',
+  readme_default_orig: '原文',
+  card_new_tip: '最近一轮采集新增',
+  notif_new_project: '新项目收录：{name}',
+  notif_new_version: '有新版：{name} {tag}',
 }

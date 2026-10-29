@@ -420,7 +420,7 @@ onUnmounted(() => {
       <div class="filter-group">
         <span class="filter-label">{{ t('filter_new') }}</span>
         <button class="chip new-chip" :class="{ active: onlyNew === 'new' }" @click="selectNew">
-          新增
+          {{ t('filter_new_only') }}
         </button>
       </div>
       <div class="filter-group">

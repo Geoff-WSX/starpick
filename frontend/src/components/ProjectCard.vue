@@ -88,7 +88,7 @@ function openInstallPrompt() {
       <div>
         <div class="card-title">
           <span class="title-link">{{ project.full_name }}</span>
-          <span v-if="project.is_new" class="new-badge" title="最近一轮采集新增">NEW</span>
+          <span v-if="project.is_new" class="new-badge" :title="t('card_new_tip')">NEW</span>
         </div>
         <div class="card-owner">@{{ project.owner }}</div>
       </div>

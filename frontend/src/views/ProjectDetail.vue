@@ -200,8 +200,8 @@ const readmeLangs = computed(() => {
   if (!d) return []
   const opts: { key: ReadmeLangKey; label: string }[] = []
   const originalIsChinese = !d.readme_zh && isChineseReadme(d.readme)
-  if (d.readme) opts.push({ key: 'default', label: originalIsChinese ? '中文' : '原文' })
-  if (d.readme_zh) opts.push({ key: 'zh', label: '中文' })
+  if (d.readme) opts.push({ key: 'default', label: originalIsChinese ? t('readme_default_zh') : t('readme_default_orig') })
+  if (d.readme_zh) opts.push({ key: 'zh', label: t('readme_default_zh') })
   if (d.readme_en) opts.push({ key: 'en', label: 'English' })
   if (extraVariant.value) {
     // 点击时才抓的版本标注「按需」，库里已采的直接用语言名

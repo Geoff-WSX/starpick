@@ -119,6 +119,15 @@ async function loadMeta() {
   } catch { /* 忽略 */ }
 }
 
+/** 通知标题双语渲染：后端存的是「新项目收录：xxx」式中文前缀，前端按已知模式映射 */
+function notifTitle(title: string): string {
+  const np = title.match(/^新项目收录：(.*)$/)
+  if (np) return t('notif_new_project').replace('{name}', np[1])
+  const nv = title.match(/^有新版：(.*?)(?:\s+(v?[\d.]+))?$/)
+  if (nv) return t('notif_new_version').replace('{name}', nv[1]).replace('{tag}', nv[2] || '')
+  return title
+}
+
 async function loadNotifications(reset = false) {
   if (notifLoading.value) return
   if (reset) notifLimit.value = 15
@@ -275,7 +284,7 @@ onUnmounted(() => {
           >
             <span v-if="!n.read_at" class="notif-dot"></span>
             <div class="notif-body">
-              <div class="notif-title">{{ n.title }}</div>
+              <div class="notif-title">{{ notifTitle(n.title) }}</div>
               <div class="notif-msg">{{ n.message }}</div>
               <div class="notif-time">{{ n.created_at.slice(5, 16).replace('T', ' ') }}</div>
             </div>

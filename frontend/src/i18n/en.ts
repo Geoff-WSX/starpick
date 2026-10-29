@@ -209,4 +209,9 @@ export default {
   fav_sort_time: 'Favorited time',
   fav_sort_stars: 'Most stars',
   fav_ungrouped: 'Ungrouped',
+  readme_default_zh: 'Chinese',
+  readme_default_orig: 'Original',
+  card_new_tip: 'Added in the latest collection round',
+  notif_new_project: 'New project: {name}',
+  notif_new_version: 'New version: {name} {tag}',
 }
