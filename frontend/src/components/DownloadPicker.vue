@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { openExternal, detectOS, formatSize, type Project } from '../api'
+import { t } from '../composables/useI18n'
 
 const props = defineProps<{ project: Project }>()
 const emit = defineEmits<{ close: [] }>()
@@ -19,7 +20,7 @@ const currentOS = detectOS()
 const groups = computed(() => {
   const map = new Map<string, typeof props.project.assets>()
   for (const a of props.project.assets) {
-    const key = a.platform || '其他'
+    const key = a.platform || t('picker_other')
     if (!map.has(key)) map.set(key, [])
     map.get(key)!.push(a)
   }
@@ -65,7 +66,7 @@ function onKeydown(e: KeyboardEvent) {
       <div class="picker-head">
         <div>
           <div class="picker-title">{{ project.full_name }}</div>
-          <div class="picker-sub">选择要下载的版本（当前系统：{{ currentOS || '未知' }}）</div>
+          <div class="picker-sub">{{ t('picker_sub').replace('{os}', currentOS || t('picker_unknown')) }}</div>
         </div>
         <button class="modal-close" title="关闭" @click="emit('close')">
           <svg class="modal-close-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -75,18 +76,18 @@ function onKeydown(e: KeyboardEvent) {
       </div>
 
       <div v-if="project.assets.length === 0" class="empty">
-        <p>暂无可用安装包</p>
-        <button class="btn ghost" @click="openGithub">去 GitHub 查看发布页</button>
+        <p>{{ t('picker_none') }}</p>
+        <button class="btn ghost" @click="openGithub">{{ t('picker_github') }}</button>
       </div>
 
       <div v-else class="picker-body">
         <div v-if="project.mirror_prefixes.length" class="hint mirror-hint">
-          已启用国内镜像加速（{{ project.mirror_prefixes[0] }}）；下载失败可换「原地址」或稍后重试。
+          {{ t('picker_mirror_on').replace('{prefix}', project.mirror_prefixes[0]) }}
         </div>
         <div v-for="g in groups" :key="g.platform" class="pick-group">
           <div class="pick-platform" :class="{ match: g.platform === currentOS }">
             {{ g.platform }}
-            <span v-if="g.platform === currentOS" class="pick-tag">当前系统</span>
+            <span v-if="g.platform === currentOS" class="pick-tag">{{ t('picker_current') }}</span>
           </div>
           <div v-for="a in g.items" :key="a.url" class="pick-row" @click="downloadBest(a.url)">
             <div class="pick-name" :title="a.name">{{ a.name }}</div>
@@ -95,7 +96,7 @@ function onKeydown(e: KeyboardEvent) {
             <button class="btn small" :title="a.url" @click.stop="download(a.url)">原地址</button>
           </div>
         </div>
-        <div class="hint">文件名可判断架构（x64/arm64 等）；不确定时优先当前系统的高亮项。</div>
+        <div class="hint">{{ t('picker_arch_hint') }}</div>
       </div>
     </div>
   </div>

@@ -2,6 +2,7 @@
 // 采集轮次历史弹窗（原独立页迁移；导航栏入口改弹窗模式）
 import { ref, watch } from 'vue'
 import { fetchRounds, type RoundInfo } from '../api'
+import { t } from '../composables/useI18n'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -26,24 +27,24 @@ function fmtDuration(sec: number | undefined): string {
   if (sec < 60) return `${sec}s`
   const m = Math.floor(sec / 60)
   const s = Math.round(sec % 60)
-  return `${m}分${s}秒`
+  return `${m}m ${s}s`
 }
 
 function statusLabel(s: string): string {
-  const map: Record<string, string> = {
-    running: '采集中', success: '成功', failed: '失败', skipped: '跳过',
+  const map: Record<string, () => string> = {
+    running: () => t('rounds_status_running'), success: () => t('rounds_status_success'), failed: () => t('rounds_status_failed'), skipped: () => t('rounds_status_skipped'),
   }
-  return map[s] ?? s
+  return map[s] ? map[s]() : s
 }
 
 // 轮次来源标签：手动 / 定时发现轮 / 每日全量轮 / 启动补跑（旧数据无标记时视为手动）
 function sourceLabel(s: string | undefined): string {
-  const map: Record<string, string> = {
-    manual: '手动', scheduled: '定时', startup: '启动补跑',
-    discovery: '定时·发现', full: '定时·全量',
-    'discovery-startup': '补跑·发现', 'full-startup': '补跑·全量',
+  const map: Record<string, () => string> = {
+    manual: () => t('rounds_src_manual'), scheduled: () => t('rounds_src_scheduled'), startup: () => t('rounds_src_startup'),
+    discovery: () => t('rounds_src_discovery'), full: () => t('rounds_src_full'),
+    'discovery-startup': () => t('rounds_src_disc_startup'), 'full-startup': () => t('rounds_src_full_startup'),
   }
-  return (s && map[s]) || '手动'
+  return (s && map[s]) ? map[s]() : t('rounds_src_manual')
 }
 
 async function load() {
@@ -53,7 +54,7 @@ async function load() {
     const data = await fetchRounds(200)
     rounds.value = data.items
   } catch (e) {
-    error.value = e instanceof Error ? e.message : '加载轮次历史失败'
+    error.value = e instanceof Error ? e.message : t('rounds_load_fail')
   } finally {
     loading.value = false
   }
@@ -76,17 +77,17 @@ function close() {
     <div class="modal modal-wide">
       <div class="modal-head">
         <div class="modal-title">
-          <h2>采集轮次历史</h2>
-        <span class="hint">每轮候选/新增/更新/跳过统计；实际耗时含分类搜索与 GitHub 限流排队</span>
+          <h2>{{ t('rounds_title') }}</h2>
+        <span class="hint">{{ t('rounds_hint') }}</span>
         </div>
-        <button class="modal-close" title="关闭" @click="close">
+        <button class="modal-close" :title="t('collect_close')" @click="close">
           <svg class="modal-close-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         </button>
       </div>
 
-      <div v-if="loading" class="empty">加载中…</div>
+      <div v-if="loading" class="empty">{{ t('loading') }}</div>
       <div v-else-if="error" class="error-banner">{{ error }}</div>
       <div v-else-if="rounds.length === 0" class="empty">暂无轮次记录，去「采集中心」开始第一轮</div>
       <div v-else class="rounds-table-wrap">
@@ -94,16 +95,16 @@ function close() {
           <thead>
             <tr>
               <th>#</th>
-              <th>开始</th>
-              <th>结束</th>
-              <th>来源</th>
-              <th>状态</th>
-              <th>候选</th>
-              <th>新增</th>
-              <th>更新</th>
-              <th>跳过</th>
-              <th title="整轮实际耗时（含分类搜索与 GitHub 限流排队等待）">实际采集耗时</th>
-              <th>说明</th>
+              <th>{{ t('rounds_col_start') }}</th>
+              <th>{{ t('rounds_col_end') }}</th>
+              <th>{{ t('rounds_col_source') }}</th>
+              <th>{{ t('rounds_col_status') }}</th>
+              <th>{{ t('rounds_col_candidates') }}</th>
+              <th>{{ t('rounds_col_inserted') }}</th>
+              <th>{{ t('rounds_col_updated') }}</th>
+              <th>{{ t('rounds_col_skipped') }}</th>
+              <th :title="t('rounds_col_duration_tip')">{{ t('rounds_col_duration') }}</th>
+              <th>{{ t('rounds_col_error') }}</th>
             </tr>
           </thead>
           <tbody>

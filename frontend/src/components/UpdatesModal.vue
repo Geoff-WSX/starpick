@@ -2,6 +2,7 @@
 // 更新检查历史弹窗（原独立页迁移；与采集轮次历史分开保存）
 import { ref, watch } from 'vue'
 import { fetchUpdateRounds, type UpdateRound } from '../api'
+import { t } from '../composables/useI18n'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -30,14 +31,14 @@ function fmtDuration(sec: number | undefined): string {
 }
 
 function statusLabel(s: string): string {
-  const map: Record<string, string> = {
-    running: '检查中', success: '成功', failed: '失败', skipped: '跳过',
+  const map: Record<string, () => string> = {
+    running: () => t('updates_status_running'), success: () => t('updates_status_success'), failed: () => t('updates_status_failed'), skipped: () => t('updates_status_skipped'),
   }
-  return map[s] ?? s
+  return map[s] ? map[s]() : s
 }
 
 function updateScopeLabel(s: string): string {
-  return s === 'full' ? '全库' : s === 'incremental' ? '增量' : s
+  return s === 'full' ? t('updates_scope_full') : s === 'incremental' ? t('updates_scope_incremental') : s
 }
 
 async function load() {
@@ -47,7 +48,7 @@ async function load() {
     const data = await fetchUpdateRounds(200)
     rounds.value = data.items
   } catch (e) {
-    error.value = e instanceof Error ? e.message : '加载更新检查历史失败'
+    error.value = e instanceof Error ? e.message : t('updates_load_fail')
   } finally {
     loading.value = false
   }
@@ -70,17 +71,17 @@ function close() {
     <div class="modal modal-wide">
       <div class="modal-head">
         <div class="modal-title">
-          <h2>更新检查历史</h2>
-        <span class="hint">对已采集项目检查 GitHub 最新 release 的轮次记录；实际耗时含限流排队</span>
+          <h2>{{ t('updates_title') }}</h2>
+        <span class="hint">{{ t('updates_hint') }}</span>
         </div>
-        <button class="modal-close" title="关闭" @click="close">
+        <button class="modal-close" :title="t('collect_close')" @click="close">
           <svg class="modal-close-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         </button>
       </div>
 
-      <div v-if="loading" class="empty">加载中…</div>
+      <div v-if="loading" class="empty">{{ t('loading') }}</div>
       <div v-else-if="error" class="error-banner">{{ error }}</div>
       <div v-else-if="rounds.length === 0" class="empty">暂无更新检查记录，去「采集中心」点击「检查更新」</div>
       <div v-else class="rounds-table-wrap">
@@ -88,16 +89,16 @@ function close() {
           <thead>
             <tr>
               <th>#</th>
-              <th>范围</th>
-              <th>开始</th>
-              <th>结束</th>
-              <th>状态</th>
-              <th>已查</th>
-              <th>发现新版</th>
-              <th>无变化</th>
-              <th>失败</th>
-              <th title="整轮实际耗时（含 GitHub 限流排队等待）">实际耗时</th>
-              <th>说明</th>
+              <th>{{ t('updates_col_scope') }}</th>
+              <th>{{ t('updates_col_start') }}</th>
+              <th>{{ t('updates_col_end') }}</th>
+              <th>{{ t('updates_col_status') }}</th>
+              <th>{{ t('updates_col_checked') }}</th>
+              <th>{{ t('updates_col_new') }}</th>
+              <th>{{ t('updates_col_nochange') }}</th>
+              <th>{{ t('updates_col_failed') }}</th>
+              <th :title="t('updates_col_duration_tip')">{{ t('updates_col_duration') }}</th>
+              <th>{{ t('updates_col_error') }}</th>
             </tr>
           </thead>
           <tbody>

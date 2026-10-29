@@ -6,6 +6,7 @@
  */
 import { onMounted, ref } from 'vue'
 import { detectOS } from '../api'
+import { t } from '../composables/useI18n'
 import { buildInstallPrompt, copyText, type InstallPromptSource } from '../installPrompt'
 
 const props = defineProps<{ project: InstallPromptSource; os?: string }>()
@@ -39,8 +40,8 @@ function onKeydown(e: KeyboardEvent) {
 async function copyAll() {
   const ok = await copyText(prompt.value)
   toast.value = ok
-    ? '已复制 ✓ 粘贴到 AI 对话框发送即可'
-    : '复制失败，请检查浏览器剪贴板权限'
+    ? t('prompt_copied')
+    : t('prompt_copy_fail')
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => (toast.value = ''), 4000)
 }
@@ -50,7 +51,7 @@ async function copyAll() {
   <div ref="maskEl" class="modal-overlay" tabindex="-1" @click.self="emit('close')" @keydown="onKeydown">
     <div class="modal">
       <div class="modal-head">
-        <h2>安装提示词</h2>
+        <h2>{{ t('prompt_title') }}</h2>
         <button class="modal-close" title="关闭" @click="emit('close')">
           <svg class="modal-close-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <path d="M6 6l12 12M18 6L6 18" />
@@ -58,14 +59,14 @@ async function copyAll() {
         </button>
       </div>
 
-      <div class="hint">复制后发给豆包等 AI 助手（选「本地电脑模式」），它会帮你下载、装好并运行</div>
+      <div class="hint">{{ t('prompt_hint') }}</div>
 
       <div class="markdown-body">
         <pre :style="preStyle"><code>{{ prompt }}</code></pre>
       </div>
 
       <div class="modal-history">
-        <button class="btn" @click="copyAll">复制全部提示词</button>
+        <button class="btn" @click="copyAll">{{ t('prompt_copy_all') }}</button>
         <button class="btn ghost" @click="emit('close')">关闭</button>
       </div>
 

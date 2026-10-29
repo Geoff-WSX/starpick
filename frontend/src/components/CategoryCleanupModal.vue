@@ -6,6 +6,7 @@ import {
   previewCategoryCleanup,
   cleanupCategories,
 } from '../api'
+import { t } from '../composables/useI18n'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -39,7 +40,7 @@ async function load() {
     counts.value = preview.counts
     running.value = preview.running
   } catch (e) {
-    error.value = e instanceof Error ? e.message : '加载分类数据失败'
+    error.value = e instanceof Error ? e.message : t('cleanup_load_fail')
   } finally {
     loading.value = false
   }
@@ -66,7 +67,7 @@ async function run() {
     counts.value = preview.counts
     running.value = preview.running
   } catch (e) {
-    error.value = e instanceof Error ? e.message : '清除失败'
+    error.value = e instanceof Error ? e.message : t('cleanup_fail')
   } finally {
     busy.value = false
   }
@@ -89,20 +90,20 @@ function close() {
     <div class="modal modal-cleanup">
       <div class="modal-head">
         <div class="modal-title">
-          <h2>清除分类项目</h2>
-          <span class="hint">删除选中分类的已入库项目；收藏的项目会保留。删除不可恢复，请谨慎勾选</span>
+          <h2>{{ t('cleanup_title') }}</h2>
+          <span class="hint">{{ t('cleanup_hint') }}</span>
         </div>
-        <button class="modal-close" title="关闭" @click="close">
+        <button class="modal-close" :title="t('collect_close')" @click="close">
           <svg class="modal-close-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         </button>
       </div>
 
-      <div v-if="loading" class="empty">加载中…</div>
+      <div v-if="loading" class="empty">{{ t('loading') }}</div>
       <div v-else-if="error && categories.length === 0" class="error-banner">{{ error }}</div>
       <template v-else>
-        <div v-if="running" class="cleanup-warn">采集任务运行中，此时无法清除——请等本轮采集结束后再试。</div>
+        <div v-if="running" class="cleanup-warn">{{ t('cleanup_warn') }}</div>
 
         <div class="cleanup-list">
           <label
@@ -117,23 +118,23 @@ function close() {
               :disabled="running || !(counts[c] > 0)"
               @change="toggle(c)"
             />
-            <span class="cleanup-name">{{ c }}</span>
-            <span class="cleanup-count">{{ counts[c] ?? 0 }} 个</span>
+            <span class="cleanup-name">{{ t('cat_' + c) }}</span>
+            <span class="cleanup-count">{{ t('cleanup_count').replace('{n}', String(counts[c] ?? 0)) }}</span>
           </label>
           <div v-if="categories.every((c) => !(counts[c] > 0))" class="empty">
-            每个分类都没有可删的项目（收藏的项目不会被计入）。
+            {{ t('cleanup_none') }}
           </div>
         </div>
 
         <div v-if="error" class="error-banner">{{ error }}</div>
         <div v-if="done" class="cleanup-done">
-          ✓ 已删除 {{ done.deleted }} 个项目<span v-if="done.kept_favorites > 0">，{{ done.kept_favorites }} 个收藏项目已保留</span>
+          {{ t('cleanup_done').replace('{n}', String(done.deleted)) }}<span v-if="done.kept_favorites > 0">，{{ done.kept_favorites }} 个收藏项目已保留</span>
         </div>
 
         <div class="modal-foot">
-          <span class="hint">{{ checked.size ? `已选 ${checked.size} 个分类，共 ${totalSelected} 个项目` : '勾选要清除的分类' }}</span>
+          <span class="hint">{{ checked.size ? t('cleanup_selected').replace('{n}', String(checked.size)).replace('{m}', String(totalSelected)) : t('cleanup_sel_hint') }}</span>
           <button class="btn danger" :disabled="!checked.size || busy || running" @click="run">
-            {{ busy ? '清除中…' : `清除选中分类${totalSelected ? `（${totalSelected}）` : ''}` }}
+            {{ busy ? t('cleanup_clearing') : t('cleanup_clear') + (totalSelected ? `（${totalSelected}）` : '') }}
           </button>
         </div>
       </template>
