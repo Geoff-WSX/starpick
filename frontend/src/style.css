@@ -2337,7 +2337,7 @@ a:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-right: 10px;
+  margin-right: 6px;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 /* 语言切换按钮：与主题按钮同规格（日夜按钮旁） */
@@ -2355,13 +2355,14 @@ a:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-right: 8px;
+  margin-right: 6px;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 .lang-btn:hover, .lang-btn.open {
   border-color: var(--accent);
   color: var(--accent-deep);
   background: var(--accent-weak);
+}
 .theme-btn:hover, .theme-btn.open {
   border-color: var(--accent);
   color: var(--accent-deep);
@@ -2374,10 +2375,11 @@ a:hover {
 
 .bell-wrap {
   position: relative;
-  margin-left: 18px;   /* 与导航/状态区保持间距 */
+  margin-left: 8px;   /* 与导航/状态区保持间距 */
 }
 .bell-btn {
   position: relative;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
