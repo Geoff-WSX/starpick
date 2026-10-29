@@ -354,4 +354,7 @@ export default {
   detail_extra_cat_tip: '跨界项目，同时属于「{c}」',
   detail_zh_friendly_tip: '官方提供中文文档或说明（官网/仓库），对中文用户友好',
   detail_ungrouped: '未分组',
+  card_update: '更新 {date}',
+  card_fav_tip: '收藏到默认分组',
+  card_fav_remove_tip: '取消收藏',
 }

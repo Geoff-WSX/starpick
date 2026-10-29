@@ -98,7 +98,7 @@ function openInstallPrompt() {
         <button
           class="fav-star"
           :class="{ on: fav }"
-          :title="fav ? '取消收藏' : '收藏到默认分组'"
+          :title="fav ? t('card_fav_remove_tip') : t('card_fav_tip')"
           @click.stop="toggleFavorite"
         >
           <svg class="fav-star-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -109,7 +109,7 @@ function openInstallPrompt() {
     </div>
 
     <div class="card-desc">
-      {{ project.description || '（无简介）' }}
+      {{ project.description || t('card_no_desc') }}
     </div>
 
     <div class="meta-row">
@@ -125,7 +125,7 @@ function openInstallPrompt() {
       <span v-if="project.language" class="tag lang">{{ project.language }}</span>
       <span v-if="project.zh_friendly" class="tag zh" title="官方提供中文文档或说明（官网/仓库），对中文用户友好">中文友好</span>
       <span v-for="p in project.platforms" :key="p" class="tag platform">{{ p }}</span>
-      <span class="tag">更新 {{ formatDate(project.pushed_at) }}</span>
+      <span class="tag">{{ t('card_update').replace('{date}', formatDate(project.pushed_at)) }}</span>
     </div>
 
     <div v-if="project.system_requirements.length" class="meta-row">
@@ -136,31 +136,31 @@ function openInstallPrompt() {
       <template v-if="probing">
         <button
           class="probe-chip"
-          title="正在后台逐个探测 GitHub release（无 Token 时限速约 60 个/小时），完成后这里会出现「下载版本」按钮。点击查看探测进度"
+          :title="t('card_detecting_tip')"
           @click.stop="openCollect"
-        >安装包检测中…</button>
+        >{{ t('card_detecting') }}</button>
         <button
           class="btn prompt"
-          title="复制安装提示词，发给豆包等能操作电脑的 AI 助手，让它帮你安装"
+          :title="t('card_prompt_tip')"
           @click.stop="openInstallPrompt"
-        >复制安装提示词</button>
+        >{{ t('card_copy_prompt') }}</button>
       </template>
       <template v-else-if="project.assets.length === 0">
         <button
           class="btn dl"
-          title="复制安装提示词，发给豆包等能操作电脑的 AI 助手，让它帮你安装"
+          :title="t('card_prompt_tip')"
           @click.stop="openInstallPrompt"
-        >复制安装提示词</button>
+        >{{ t('card_copy_prompt') }}</button>
       </template>
       <template v-else>
         <button class="btn dl" @click.stop="download">
-          下载版本 · {{ project.assets.length }} 个
+          {{ t('card_download').replace('{n}', String(project.assets.length)) }}
         </button>
         <button
           class="btn prompt"
-          title="复制安装提示词，发给豆包等能操作电脑的 AI 助手，让它帮你安装"
+          :title="t('card_prompt_tip')"
           @click.stop="openInstallPrompt"
-        >复制安装提示词</button>
+        >{{ t('card_copy_prompt') }}</button>
       </template>
     </div>
   </article>

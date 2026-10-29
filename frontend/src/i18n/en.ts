@@ -354,4 +354,7 @@ Favorited projects are kept; the DB is auto-backed up before deletion.`,
   detail_extra_cat_tip: 'Cross-category, also in "{c}"',
   detail_zh_friendly_tip: 'Official Chinese docs or notes available (site/repo)',
   detail_ungrouped: 'Ungrouped',
+  card_update: 'Updated {date}',
+  card_fav_tip: 'Add to favorites',
+  card_fav_remove_tip: 'Remove from favorites',
 }

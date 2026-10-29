@@ -357,7 +357,7 @@ function fmtTimeShort(iso: string): string {
               class="chip custom-chip"
               :class="{ active: customMode }"
               @click="toggleCustom"
-            >自定义分类</button>
+            >{{ t('collect_custom') }}</button>
           </div>
         </div>
         <div v-if="customMode" class="param-custom">
@@ -369,9 +369,9 @@ function fmtTimeShort(iso: string): string {
             <span class="param-label">{{ t('collect_keywords') }}</span>
             <input v-model="customCatKeywords" :placeholder="t('collect_keywords_ph')" />
           </label>
-          <span class="param-hint">自定义分类会自动保存到首页分类；可与上方多选分类同时采集</span>
+          <span class="param-hint">{{ t('collect_custom_hint') }}</span>
         </div>
-        <span class="param-hint">分类可多选，可与自定义分类同时采集；每个分类最多收录 {{ collectParams?.per_category_max ?? '—' }} 个项目。</span>
+        <span class="param-hint">{{ t('collect_cats_hint').replace('{n}', String(collectParams?.per_category_max ?? '—')) }}</span>
       </div>
 
       <!-- 采集进度面板（仅进行中或后台回填未完成时展示） -->
@@ -393,10 +393,10 @@ function fmtTimeShort(iso: string): string {
           ></div>
         </div>
         <div class="cp-meta">
-          <span v-if="collectStatus.categories_total > 0">分类 {{ collectStatus.categories_done }}/{{ collectStatus.categories_total }}</span>
-          <span v-if="collectStatus.enriched_total > 0">详情 {{ collectStatus.enriched_done }}/{{ collectStatus.enriched_total }}</span>
+          <span v-if="collectStatus.categories_total > 0">{{ t('collect_cat_progress').replace('{a}', String(collectStatus.categories_done)).replace('{b}', String(collectStatus.categories_total)) }}</span>
+          <span v-if="collectStatus.enriched_total > 0">{{ t('collect_detail_progress').replace('{a}', String(collectStatus.enriched_done)).replace('{b}', String(collectStatus.enriched_total)) }}</span>
           <span v-if="collectStatus.backfill_total > 0" :class="{ pending: !collectStatus.running && collectStatus.backfill_done < collectStatus.backfill_total }">
-            安装包 {{ collectStatus.backfill_done }}/{{ collectStatus.backfill_total }}{{ !collectStatus.running && collectStatus.backfill_done < collectStatus.backfill_total ? '（后台继续）' : '' }}
+            {{ t('collect_pkg_progress').replace('{a}', String(collectStatus.backfill_done)).replace('{b}', String(collectStatus.backfill_total)) }}{{ !collectStatus.running && collectStatus.backfill_done < collectStatus.backfill_total ? '（后台继续）' : '' }}
           </span>
           <span v-if="!runningNow" class="cp-finished">{{ collectStatus.message }}</span>
         </div>
@@ -405,7 +405,7 @@ function fmtTimeShort(iso: string): string {
       <!-- 更新检查控制 -->
       <div class="collect-ctrl update-ctrl">
         <button class="btn" :disabled="updateRunning || !!updateStatus?.running" @click="runUpdates">
-          {{ updateRunning ? '触发中…' : updateStatus?.running ? '检查进行中…' : '检查更新' }}
+          {{ updateRunning ? t('collect_triggering') : updateStatus?.running ? t('collect_update_checking') : t('collect_update_check') }}
         </button>
         <div class="param-item cat-multi">
           <span class="param-label">{{ t('collect_update_check_cats') }}</span>
@@ -420,31 +420,31 @@ function fmtTimeShort(iso: string): string {
             >{{ c }}</button>
           </div>
         </div>
-        <span class="collect-hint">对已采集项目逐个检查 GitHub 最新 release，标记有新版的条目（详情页可对比版本）；在此手动触发增量检查，历史与采集轮次分开保存</span>
+        <span class="collect-hint">{{ t('collect_update_hint') }}</span>
       </div>
 
       <!-- 更新检查进度面板：进行中显示进度；结束后保留本次结果摘要 -->
       <div v-if="updatePanelVisible" class="collect-panel update-panel" :class="{ done: !updateStatus?.running }">
         <div class="cp-head">
-          <span class="cp-phase">{{ updateStatus?.running ? '检查更新' : '检查完成' }}</span>
+          <span class="cp-phase">{{ updateStatus?.running ? t('collect_update_phase') : t('collect_update_done') }}</span>
           <span class="cp-msg">{{ updateStatus?.running ? updateStatus.message : '本次更新检查已结束' }}</span>
         </div>
         <div v-if="updateStatus?.running" class="cp-bar">
           <div class="cp-bar-fill" :style="{ width: updatePct(updateStatus.done, updateStatus.total) }"></div>
         </div>
         <div class="cp-meta">
-          <span v-if="updateStatus?.running">进度 {{ updateStatus.done }}/{{ updateStatus.total }}</span>
-          <span class="strong">发现新版 {{ updateStatus?.updated }}</span>
-          <span>无变化 {{ updateStatus?.nochange }}</span>
-          <span v-if="(updateStatus?.failed ?? 0) > 0" class="err-text">失败 {{ updateStatus?.failed }}</span>
+          <span v-if="updateStatus?.running">{{ t('collect_update_progress').replace('{a}', String(updateStatus.done)).replace('{b}', String(updateStatus.total)) }}</span>
+          <span class="strong">{{ t('collect_update_found').replace('{n}', String(updateStatus?.updated)) }}</span>
+          <span>{{ t('collect_update_nochange').replace('{n}', String(updateStatus?.nochange)) }}</span>
+          <span v-if="(updateStatus?.failed ?? 0) > 0" class="err-text">{{ t('collect_update_failed').replace('{n}', String(updateStatus?.failed)) }}</span>
           <span v-if="!updateStatus?.running && updateStatus?.updated_at" class="cp-time">完成 {{ fmtTimeShort(updateStatus?.updated_at ?? '') }}</span>
         </div>
       </div>
 
       <!-- 历史入口：打开内嵌子弹窗，不再跳转路由 -->
       <div class="modal-history">
-        <button class="btn ghost small" @click="roundsOpen = true">采集轮次历史</button>
-        <button class="btn ghost small" @click="updatesOpen = true">更新检查历史</button>
+        <button class="btn ghost small" @click="roundsOpen = true">{{ t('collect_rounds_hist') }}</button>
+        <button class="btn ghost small" @click="updatesOpen = true">{{ t('collect_updates_hist') }}</button>
       </div>
 
       <div v-if="toast" class="toast">{{ toast }}</div>
