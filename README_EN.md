@@ -62,8 +62,8 @@ In one sentence: **you don't need to know GitHub — you only need to know the "
 
 | Platform | File | Notes |
 |----------|------|-------|
-| Windows 10/11 (x64) | `StarPick-1.2-setup.exe` | Double-click install, per-user, no admin |
-| macOS (Apple Silicon, 11+) | `StarPick-1.2-arm64.dmg` | Drag into Applications |
+| Windows 10/11 (x64) | `StarPick-1.3-setup.exe` | Double-click install, per-user, no admin |
+| macOS (Apple Silicon, 11+) | `StarPick-1.3-arm64.dmg` | Drag into Applications |
 
 - **Data & logs**: macOS `~/Library/Application Support/StarPick/`; Windows `%APPDATA%\StarPick\`. Uninstall keeps your data.
 - **Updates**: Settings → About → "Check now"; auto-checks every 6 hours. In-place upgrades keep data.
