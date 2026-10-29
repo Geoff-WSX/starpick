@@ -805,7 +805,17 @@ def categories() -> dict[str, Any]:
     """全部分类（内置 + 自定义）与各分类项目总数，供首页筛选与采集中心分类选择。"""
     names = _all_categories()
     counts = state.db.category_counts(names) if state.db is not None else {}
-    return {"categories": names, "counts": counts}
+    # 自定义分类的英文名：取关键词里的首个英文词（英文模式回退显示用，
+    # 如「测试工具」→ test-tools）；无英文关键词则前端回退中文原名。
+    custom_en: dict[str, str] = {}
+    if state.db is not None:
+        for row in state.db.list_custom_categories():
+            for kw in (row["keywords"] or "").split(","):
+                kw = kw.strip()
+                if kw and kw.isascii():
+                    custom_en[row["name"]] = kw
+                    break
+    return {"categories": names, "counts": counts, "custom_en": custom_en}
 
 
 def _all_categories() -> list[str]:

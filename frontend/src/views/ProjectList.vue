@@ -11,7 +11,7 @@ import {
   type Project,
 } from '../api'
 import AppHeader from '../components/AppHeader.vue'
-import { t } from '../composables/useI18n'
+import { t, registerCustomCategoryEn } from '../composables/useI18n'
 
 const route = useRoute()
 const router = useRouter()
@@ -43,6 +43,7 @@ fetchCategories()
     const list = r.categories ?? []
     CATEGORIES.value = ['', ...list]
     categoryCounts.value = r.counts ?? {}
+    if (r.custom_en) registerCustomCategoryEn(r.custom_en)
   })
   .catch(() => { /* 后端暂不可用：保留内置兜底 */ })
 const LANGS = [

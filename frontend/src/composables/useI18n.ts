@@ -33,4 +33,12 @@ export function t(key: string): string {
   return key
 }
 
+/** 注册自定义分类的英文名（来自 /api/categories 的 custom_en）：
+ * 英文模式下自定义分类显示其英文关键词（如「测试工具」→ test-tools）。 */
+export function registerCustomCategoryEn(mapping: Record<string, string>) {
+  for (const [zhName, enName] of Object.entries(mapping)) {
+    dicts.en['cat_' + zhName] = enName
+  }
+}
+
 export const currentLang = computed(() => lang.value)

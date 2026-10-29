@@ -222,7 +222,7 @@ export function fetchCollectParams(): Promise<CollectParams> {
   return getJson('/api/collect/params')
 }
 
-export function fetchCategories(): Promise<{ categories: string[]; counts?: Record<string, number> }> {
+export function fetchCategories(): Promise<{ categories: string[]; counts?: Record<string, number>; custom_en?: Record<string, string> }> {
   return getJson('/api/categories')
 }
 
