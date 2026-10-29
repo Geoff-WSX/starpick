@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
+import { t } from '../composables/useI18n'
 import {
   addFavorite,
   detectOS,
@@ -561,15 +562,15 @@ function back() {
         <p class="desc-zh">{{ detail.description || '（无简介）' }}</p>
 
         <div class="meta-row">
-          <span class="tag">{{ detail.category }}</span>
+          <span class="tag">{{ t('cat_' + detail.category) }}</span>
           <span
             v-for="c in extraCategories"
             :key="c"
             class="tag extra-cat"
             :title="`跨界项目，同时属于「${c}」`"
-          >{{ c }}</span>
+          >{{ t('cat_' + c) }}</span>
           <span v-if="detail.lang" class="tag" :class="detail.lang === 'zh' ? 'lang-zh' : 'lang-en'">
-            {{ detail.lang === 'zh' ? '中文' : '英文' }}
+            {{ detail.lang === 'zh' ? t('filter_zh') : t('filter_en') }}
           </span>
           <span v-if="detail.language" class="tag lang">{{ detail.language }}</span>
           <span v-if="detail.zh_friendly" class="tag zh" title="官方提供中文文档或说明（官网/仓库），对中文用户友好">中文友好</span>
@@ -704,7 +705,7 @@ function back() {
       <section v-if="similar.length > 0" class="panel">
         <div class="readme-head">
           <span>相似项目推荐</span>
-          <span class="hint">同「{{ detail?.category }}」分类 · star 数量级相近</span>
+          <span class="hint">同「{{ t('cat_' + (detail?.category || '')) }}」分类 · star 数量级相近</span>
         </div>
         <div class="similar-grid">
           <router-link

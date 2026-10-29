@@ -382,7 +382,7 @@ onUnmounted(() => {
         >
           <span class="pick-rank">#{{ p.rank }}</span>
           <span class="pick-name">{{ p.name }}</span>
-          <span class="tag">{{ p.category }}</span>
+          <span class="tag">{{ t('cat_' + p.category) }}</span>
           <span class="stars">★ {{ formatK(p.stars) }}</span>
         </router-link>
       </div>
