@@ -13,6 +13,7 @@ import {
   type CollectStatus,
   type UpdateStatus,
 } from '../api'
+import { t } from '../composables/useI18n'
 import RoundsModal from './RoundsModal.vue'
 import UpdatesModal from './UpdatesModal.vue'
 import BaseSelect from './BaseSelect.vue'
@@ -78,40 +79,40 @@ function toggleCustom() {
   customMode.value = !customMode.value
 }
 const STAR_OPTIONS = [
-  { label: '不限制', value: 0 },
-  { label: '≥ 50', value: 50 },
-  { label: '≥ 100', value: 100 },
-  { label: '≥ 200', value: 200 },
-  { label: '≥ 500', value: 500 },
-  { label: '≥ 1000', value: 1000 },
+  { label: () => t('collect_limit_none'), value: 0 },
+  { label: () => '≥ 50', value: 50 },
+  { label: () => '≥ 100', value: 100 },
+  { label: () => '≥ 200', value: 200 },
+  { label: () => '≥ 500', value: 500 },
+  { label: () => '≥ 1000', value: 1000 },
 ]
 const ACTIVE_OPTIONS = [
-  { label: '30 天内', value: 30 },
-  { label: '60 天内', value: 60 },
-  { label: '90 天内', value: 90 },
-  { label: '180 天内', value: 180 },
-  { label: '不限', value: 0 },
+  { label: () => t('collect_limit_30d'), value: 30 },
+  { label: () => t('collect_limit_60d'), value: 60 },
+  { label: () => t('collect_limit_90d'), value: 90 },
+  { label: () => t('collect_limit_180d'), value: 180 },
+  { label: () => t('collect_limit_unlimited'), value: 0 },
 ]
 // 每类收录上限：第一项显示后端默认值（配置可调）
 const PER_CAT_OPTIONS = computed(() => [
-  { label: `默认（${collectParams.value?.per_category_max ?? 100} 个）`, value: 0 },
-  { label: '最多 50 个', value: 50 },
-  { label: '最多 100 个', value: 100 },
-  { label: '最多 200 个', value: 200 },
-  { label: '最多 500 个', value: 500 },
+  { label: () => t('collect_limit_default').replace('{n}', String(collectParams.value?.per_category_max ?? 100)), value: 0 },
+  { label: () => t('collect_limit_50'), value: 50 },
+  { label: () => t('collect_limit_100'), value: 100 },
+  { label: () => t('collect_limit_200'), value: 200 },
+  { label: () => t('collect_limit_500'), value: 500 },
 ])
 
 let pollTimer: ReturnType<typeof setInterval> | undefined
 let updatePollTimer: ReturnType<typeof setInterval> | undefined
 
-const PHASE_LABEL: Record<string, string> = {
-  searching: '搜索项目',
-  enriching: '抓取详情',
-  storing: '入库去重',
-  backfilling: '安装包回填',
-  finished: '已完成',
+const PHASE_LABEL: Record<string, () => string> = {
+  searching: () => t('collect_phase_searching'),
+  enriching: () => t('collect_phase_enriching'),
+  storing: () => t('collect_phase_storing'),
+  backfilling: () => t('collect_phase_backfilling'),
+  finished: () => t('collect_phase_finished'),
 }
-const phaseLabel = computed(() => PHASE_LABEL[collectStatus.value?.phase ?? ''] ?? '')
+const phaseLabel = computed(() => { const f = PHASE_LABEL[collectStatus.value?.phase ?? '']; return f ? f() : '' })
 const runningNow = computed(() => !!collectStatus.value?.running)
 
 function pct(done: number, totalN: number): string {
@@ -184,13 +185,13 @@ async function runNow() {
       payload.custom_keywords = customCatKeywords.value.trim()
     }
     const res = await triggerRun(payload)
-    toast.value = res.reason || '采集已触发，稍后刷新查看结果'
+    toast.value = res.reason || t('collect_triggered')
     setTimeout(() => (toast.value = ''), 5000)
     if (res.status === 'accepted' || res.status === 'running') {
       startPolling()
     }
   } catch (e) {
-    toast.value = e instanceof Error ? e.message : '触发失败'
+    toast.value = e instanceof Error ? e.message : t('collect_trigger_fail')
     setTimeout(() => (toast.value = ''), 5000)
   } finally {
     running.value = false
@@ -239,13 +240,13 @@ async function runUpdates() {
   try {
     const cats = updateCats.value.length ? [...updateCats.value] : undefined
     const res = await triggerUpdates(cats)
-    toast.value = res.reason || '更新检查已触发，完成后展示结果'
+    toast.value = res.reason || t('collect_update_triggered')
     setTimeout(() => (toast.value = ''), 5000)
     if (res.status === 'started') {
       startUpdatePolling()
     }
   } catch (e) {
-    toast.value = e instanceof Error ? e.message : '触发失败'
+    toast.value = e instanceof Error ? e.message : t('collect_trigger_fail')
     setTimeout(() => (toast.value = ''), 5000)
   } finally {
     updateRunning.value = false
@@ -306,8 +307,8 @@ function fmtTimeShort(iso: string): string {
   <div v-if="open" class="modal-overlay" @click.self="close">
     <div class="collect-modal">
       <div class="modal-head">
-        <h2>采集中心</h2>
-        <button class="modal-close" title="关闭" @click="close">
+        <h2>{{ t('collect_title') }}</h2>
+        <button class="modal-close" :title="t('collect_close')" @click="close">
           <svg class="modal-close-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
@@ -317,32 +318,32 @@ function fmtTimeShort(iso: string): string {
       <!-- 采集控制 -->
       <div class="collect-ctrl">
         <button class="btn" :disabled="running || runningNow" @click="runNow">
-          {{ running ? '触发中…' : runningNow ? '采集进行中…' : '立即采集' }}
+          {{ running ? t('collect_triggering') : runningNow ? t('collect_running') : t('collect_start') }}
         </button>
         <!-- Token 状态提示：无 Token 引导配置，有 Token 显示预计耗时（数值来自实际轮次统计） -->
-        <span v-if="hasToken" class="collect-hint">已配置 GitHub Token：全量单轮约 3-5 分钟（视分类规模，采集后后台继续探测安装包）</span>
+        <span v-if="hasToken" class="collect-hint">{{ t('collect_has_token') }}</span>
         <span v-else class="collect-hint collect-hint-warn">
-          未配置 GitHub Token：单轮约 15-30 分钟（匿名限流排队）
-          <button class="link-btn" @click="emit('openSettings')">去配置</button>
+          {{ t('collect_no_token') }}
+          <button class="link-btn" @click="emit('openSettings')">{{ t('collect_go_config') }}</button>
         </span>
       </div>
 
       <!-- 采集参数（本轮过滤条件，可手动选择覆盖默认值） -->
       <div class="collect-params">
         <div class="param-item">
-          <span class="param-label">Star 门槛</span>
+          <span class="param-label">{{ t('collect_star') }}</span>
           <BaseSelect v-model="minStars" :options="STAR_OPTIONS" />
         </div>
         <div class="param-item">
-          <span class="param-label">活跃时间</span>
+          <span class="param-label">{{ t('collect_activity') }}</span>
           <BaseSelect v-model="maxInactiveDays" :options="ACTIVE_OPTIONS" />
         </div>
         <div class="param-item">
-          <span class="param-label">每类收录</span>
+          <span class="param-label">{{ t('collect_per_cat') }}</span>
           <BaseSelect v-model="perCatTop" :options="PER_CAT_OPTIONS" />
         </div>
         <div class="param-item cat-multi">
-          <span class="param-label">采集分类</span>
+          <span class="param-label">{{ t('collect_categories') }}</span>
           <div class="cat-chips">
             <button class="chip" :class="{ active: collectCats.length === 0 }" @click="resetCats">全部</button>
             <button
@@ -361,12 +362,12 @@ function fmtTimeShort(iso: string): string {
         </div>
         <div v-if="customMode" class="param-custom">
           <label class="param-item">
-            <span class="param-label">分类名称</span>
-            <input v-model="customCatName" placeholder="如：学习工具" />
+            <span class="param-label">{{ t('collect_cat_name') }}</span>
+            <input v-model="customCatName" :placeholder="t('collect_cat_name_ph')" />
           </label>
           <label class="param-item">
-            <span class="param-label">关键词（逗号分隔）</span>
-            <input v-model="customCatKeywords" placeholder="如：study, education, 学习" />
+            <span class="param-label">{{ t('collect_keywords') }}</span>
+            <input v-model="customCatKeywords" :placeholder="t('collect_keywords_ph')" />
           </label>
           <span class="param-hint">自定义分类会自动保存到首页分类；可与上方多选分类同时采集</span>
         </div>
@@ -407,7 +408,7 @@ function fmtTimeShort(iso: string): string {
           {{ updateRunning ? '触发中…' : updateStatus?.running ? '检查进行中…' : '检查更新' }}
         </button>
         <div class="param-item cat-multi">
-          <span class="param-label">检查分类</span>
+          <span class="param-label">{{ t('collect_update_check_cats') }}</span>
           <div class="cat-chips">
             <button class="chip" :class="{ active: updateCats.length === 0 }" @click="resetUpdateCats">全部</button>
             <button

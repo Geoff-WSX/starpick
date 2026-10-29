@@ -9,11 +9,12 @@ import {
   type FavoriteGroups,
   type FavoriteOut,
 } from '../api'
+import { t } from '../composables/useI18n'
 import BaseSelect from './BaseSelect.vue'
 
 const SORT_OPTIONS = [
-  { label: '收藏时间', value: 'time' },
-  { label: 'Star 最多', value: 'stars' },
+  { label: () => t('fav_sort_time'), value: 'time' },
+  { label: () => t('fav_sort_stars'), value: 'stars' },
 ]
 
 const props = defineProps<{ open: boolean }>()
@@ -54,7 +55,7 @@ async function load() {
     items.value = data.items
     groups.value = data.groups
   } catch (e) {
-    error.value = e instanceof Error ? e.message : '加载收藏失败'
+    error.value = e instanceof Error ? e.message : t('fav_load_fail')
   } finally {
     loading.value = false
   }
@@ -70,7 +71,7 @@ const allCount = computed(() => groups.value.reduce((sum, g) => sum + g.cnt, 0))
 async function unfav(item: FavoriteOut) {
   try {
     await removeFavorite(item.project_id)
-    toast.value = '已取消收藏'
+    toast.value = t('fav_removed')
     setTimeout(() => (toast.value = ''), 3000)
     load()
   } catch { /* 忽略 */ }
@@ -98,8 +99,8 @@ function close() {
   <div v-if="open" class="modal-overlay" @click.self="close">
     <div class="modal modal-wide">
       <div class="modal-head">
-        <h2>我的收藏</h2>
-        <button class="modal-close" title="关闭" @click="close">
+        <h2>{{ t('fav_title') }}</h2>
+        <button class="modal-close" :title="t('collect_close')" @click="close">
           <svg class="modal-close-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
@@ -109,7 +110,7 @@ function close() {
       <!-- 分组筛选 -->
       <div class="fav-groups">
         <button class="fav-group-tab" :class="{ active: activeGroup === '' }" @click="pickGroup('')">
-          全部 <span class="cnt">{{ allCount }}</span>
+          {{ t('fav_all') }} <span class="cnt">{{ allCount }}</span>
         </button>
         <button
           v-for="g in groups"
@@ -118,7 +119,7 @@ function close() {
           :class="{ active: activeGroup === g.group_name }"
           @click="pickGroup(g.group_name)"
         >
-          {{ g.group_name }} <span class="cnt">{{ g.cnt }}</span>
+          {{ g.group_name === '未分组' ? t('fav_ungrouped') : t('cat_' + g.group_name) }} <span class="cnt">{{ g.cnt }}</span>
         </button>
       </div>
 
@@ -128,15 +129,15 @@ function close() {
           v-model="searchQ"
           class="fav-search"
           type="text"
-          placeholder="搜索收藏：项目名 / 描述"
+          :placeholder="t('fav_search_ph')"
         />
         <BaseSelect v-model="sortMode" :options="SORT_OPTIONS" class="fav-sort" />
-        <span class="fav-count dim">{{ filtered.length }} 个</span>
+        <span class="fav-count dim">{{ t('fav_count').replace('{n}', String(filtered.length)) }}</span>
       </div>
 
-      <div v-if="loading" class="empty">加载中…</div>
+      <div v-if="loading" class="empty">{{ t('fav_loading') }}</div>
       <div v-else-if="error" class="error-banner">{{ error }}</div>
-      <div v-else-if="filtered.length === 0" class="empty">暂无收藏项目，去项目列表点击星标收藏即可加入</div>
+      <div v-else-if="filtered.length === 0" class="empty">{{ t('fav_empty') }}</div>
       <div v-else class="fav-list">
         <div v-for="item in filtered" :key="item.project_id" class="fav-card">
           <div class="fav-main" @click="openDetail(item.project_id)">
@@ -144,17 +145,17 @@ function close() {
               <span class="fav-name">{{ item.name }}</span>
               <span class="fav-full">github.com/{{ item.full_name }}</span>
             </div>
-            <div class="fav-desc">{{ item.description || '（无简介）' }}</div>
+            <div class="fav-desc">{{ item.description || t('fav_no_desc') }}</div>
             <div class="fav-meta">
-              <span class="tag">{{ item.category }}</span>
+              <span class="tag">{{ t('cat_' + item.category) }}</span>
               <span v-if="item.language" class="tag lang">{{ item.language }}</span>
               <span class="stars">★ {{ formatStars(item.stars) }}</span>
-              <span v-if="item.has_update" class="tag upd">有新版本 {{ item.latest_tag || '' }}</span>
-              <span class="dim">收藏于 {{ item.favorited_at.slice(0, 10) }}</span>
+              <span v-if="item.has_update" class="tag upd">{{ t('fav_has_update').replace('{tag}', item.latest_tag || '') }}</span>
+              <span class="dim">{{ t('fav_favorited_at').replace('{date}', item.favorited_at.slice(0, 10)) }}</span>
             </div>
           </div>
           <div class="fav-ops">
-            <button class="btn ghost small" @click="unfav(item)">取消收藏</button>
+            <button class="btn ghost small" @click="unfav(item)">{{ t('fav_unfav') }}</button>
           </div>
         </div>
       </div>

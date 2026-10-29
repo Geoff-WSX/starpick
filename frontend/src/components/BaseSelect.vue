@@ -6,7 +6,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 // scroll 事件直接挂载到滚动容器（scroll 不冒泡）。
 const props = defineProps<{
   modelValue: string | number
-  options: { value: string | number; label: string }[]
+  options: { value: string | number; label: string | (() => string) }[]
   disabled?: boolean
 }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: string | number): void }>()
@@ -15,9 +15,10 @@ const open = ref(false)
 // 弹窗（overflow 滚动容器）内空间不足时向上展开，避免菜单被裁剪
 const menuUp = ref(false)
 const root = ref<HTMLElement | null>(null)
-const label = computed(
-  () => props.options.find((o) => o.value === props.modelValue)?.label ?? '',
-)
+const label = computed(() => {
+  const l = props.options.find((o) => o.value === props.modelValue)?.label
+  return typeof l === 'function' ? l() : (l ?? '')
+})
 
 function toggle() {
   if (props.disabled) return
@@ -124,7 +125,7 @@ onUnmounted(() => {
         :class="{ active: o.value === modelValue }"
         @click.stop="pick(o.value)"
       >
-        {{ o.label }}
+        {{ typeof o.label === 'function' ? o.label() : o.label }}
       </button>
     </div>
   </div>
