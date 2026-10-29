@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { t } from '../composables/useI18n'
 
 // 通用下拉：自绘菜单（视觉与首页排序下拉一致）
 // 稳定性保障：选项点击防冒泡、空间不足向上翻转、滚动仅完全滚出时收起、
@@ -115,7 +116,7 @@ onUnmounted(() => {
     :class="{ open, disabled, 'menu-up': menuUp }"
     @click="toggle"
   >
-    <span class="bs-value">{{ label || '请选择' }}</span>
+    <span class="bs-value">{{ label || t('bs_placeholder') }}</span>
     <span class="bs-caret" aria-hidden="true"></span>
     <div v-if="open" class="bs-menu">
       <button

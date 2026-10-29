@@ -24,6 +24,19 @@ export function toggleLang() {
 
 const dicts: Record<UiLang, Record<string, string>> = { zh, en }
 
+/** 系统要求前缀映射：后端生成的数据是「内存: 4 MiB」中文前缀，英文模式映射 */
+export function mapReqLabel(r: string): string {
+  const map: [string, string][] = [
+    ['内存', 'req_mem'], ['磁盘空间', 'req_disk'], ['GPU/显卡', 'req_gpu'],
+    ['显存', 'req_vram'], ['Python 版本', 'req_py'], ['Node.js', 'req_node'],
+    ['Docker', 'req_docker'], ['系统', 'req_sys'],
+  ]
+  for (const [zh, key] of map) {
+    if (r.startsWith(zh + ':')) return t(key) + r.slice(zh.length)
+  }
+  return r
+}
+
 export function t(key: string): string {
   const v = dicts[lang.value][key] ?? dicts.zh[key]
   if (v !== undefined) return v

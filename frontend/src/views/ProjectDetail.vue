@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
-import { t } from '../composables/useI18n'
+import { t, mapReqLabel } from '../composables/useI18n'
 import {
   addFavorite,
   detectOS,
@@ -548,7 +548,7 @@ function back() {
           <path d="M7 31a17 17 0 0 0 34 0" fill="none" stroke="var(--text)" stroke-width="4.5" stroke-linecap="round" />
           <path d="M24 7l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7-5.4-4.7 7.1-.6z" fill="var(--accent)" />
         </svg>
-        <span class="detail-name">{{ detail?.name || detail?.full_name || '项目详情' }}</span>
+        <span class="detail-name">{{ detail?.name || detail?.full_name || t('detail_name_fallback') }}</span>
       </h1>
       <span v-if="detail" class="stars">★ {{ formatStars(detail.stars) }}</span>
     </header>
@@ -573,13 +573,13 @@ function back() {
             {{ detail.lang === 'zh' ? t('filter_zh') : t('filter_en') }}
           </span>
           <span v-if="detail.language" class="tag lang">{{ detail.language }}</span>
-          <span v-if="detail.zh_friendly" class="tag zh" :title="t('detail_zh_friendly_tip')">中文友好</span>
+          <span v-if="detail.zh_friendly" class="tag zh" :title="t('detail_zh_friendly_tip')">{{ t('card_zh_friendly') }}</span>
           <span v-for="p in detail.platforms" :key="p" class="tag platform">{{ p }}</span>
           <span class="tag">{{ t('detail_update').replace('{date}', formatDate(detail.pushed_at)) }}</span>
         </div>
 
         <div v-if="detail.system_requirements.length" class="meta-row">
-          <span v-for="r in detail.system_requirements" :key="r" class="tag req" :title="r">{{ r }}</span>
+          <span v-for="r in detail.system_requirements" :key="r" class="tag req" :title="mapReqLabel(r)">{{ mapReqLabel(r) }}</span>
         </div>
 
         <!-- 动作区：主操作居左，辅助动作右对齐；收藏并入行首，不再独占一行 -->
@@ -648,7 +648,7 @@ function back() {
         <div v-if="healthSnaps.length >= 2" class="health-block">
           <div class="health-head">
             <span>{{ t('detail_health') }}</span>
-            <span class="hint">{{ healthRangeLabel }} · {{ healthSnaps.length }} 个检查快照</span>
+            <span class="hint">{{ healthRangeLabel }} · {{ t('health_snapshots').replace('{n}', String(healthSnaps.length)) }}</span>
           </div>
           <svg class="health-svg" viewBox="0 0 320 64" preserveAspectRatio="none" role="img" aria-label="Star 变化曲线">
             <polygon :points="healthArea" fill="rgba(255,153,0,0.12)"></polygon>
@@ -661,7 +661,7 @@ function back() {
               r="2.5"
               fill="#ff9900"
             >
-              <title>{{ formatStars(s.stars) }}（{{ s.checked_at }}）{{ s.has_update ? '· 有新版本 ' + s.latest_tag : '' }}</title>
+              <title>{{ t('health_tip').replace('{stars}', formatStars(s.stars)).replace('{time}', s.checked_at).replace('{update}', s.has_update ? '· ' + t('health_has_update') + ' ' + s.latest_tag : '') }}</title>
             </circle>
           </svg>
         </div>

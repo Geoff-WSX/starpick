@@ -88,7 +88,7 @@ function close() {
 
       <div v-if="loading" class="empty">{{ t('loading') }}</div>
       <div v-else-if="error" class="error-banner">{{ error }}</div>
-      <div v-else-if="rounds.length === 0" class="empty">暂无更新检查记录，去「采集中心」点击「检查更新」</div>
+      <div v-else-if="rounds.length === 0" class="empty">{{ t('updates_empty') }}</div>
       <div v-else class="rounds-table-wrap">
         <table class="rounds-table">
           <thead>

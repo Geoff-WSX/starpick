@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { Project } from '../api'
 import { addFavorite, removeFavorite, formatDate, formatStars } from '../api'
-import { t } from '../composables/useI18n'
+import { t, mapReqLabel } from '../composables/useI18n'
 import DownloadPicker from './DownloadPicker.vue'
 import InstallPromptModal from './InstallPromptModal.vue'
 
@@ -123,13 +123,13 @@ function openInstallPrompt() {
         {{ project.lang === 'zh' ? t('filter_zh') : t('filter_en') }}
       </span>
       <span v-if="project.language" class="tag lang">{{ project.language }}</span>
-      <span v-if="project.zh_friendly" class="tag zh" title="官方提供中文文档或说明（官网/仓库），对中文用户友好">中文友好</span>
+      <span v-if="project.zh_friendly" class="tag zh" :title="t('card_zh_friendly_tip')">{{ t('card_zh_friendly') }}</span>
       <span v-for="p in project.platforms" :key="p" class="tag platform">{{ p }}</span>
       <span class="tag">{{ t('card_update').replace('{date}', formatDate(project.pushed_at)) }}</span>
     </div>
 
     <div v-if="project.system_requirements.length" class="meta-row">
-      <span v-for="r in project.system_requirements" :key="r" class="tag req" :title="r">{{ r }}</span>
+      <span v-for="r in project.system_requirements" :key="r" class="tag req" :title="mapReqLabel(r)">{{ mapReqLabel(r) }}</span>
     </div>
 
     <div class="card-foot">
