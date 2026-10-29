@@ -25,7 +25,12 @@ export function toggleLang() {
 const dicts: Record<UiLang, Record<string, string>> = { zh, en }
 
 export function t(key: string): string {
-  return dicts[lang.value][key] ?? dicts.zh[key] ?? key
+  const v = dicts[lang.value][key] ?? dicts.zh[key]
+  if (v !== undefined) return v
+  // 自定义分类没有英文映射：回退显示中文原名（去掉 cat_ 前缀），
+  // 而不是返回原始 key「cat_xxx」——见首页筛选 chip 自定义分类场景
+  if (key.startsWith('cat_')) return key.slice(4)
+  return key
 }
 
 export const currentLang = computed(() => lang.value)
