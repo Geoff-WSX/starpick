@@ -205,11 +205,9 @@ function close() {
                 {{ info?.has_token ? i18nT('settings_token_configured') : i18nT('settings_token_none') }}
               </span>
             </div>
-            <p class="settings-desc">
-              配置后 GitHub API 限流大幅提升（搜索 10→30 次/分钟、普通请求 60/小时→5000/小时），一轮全量采集由约 20 分钟降至约 3-5 分钟。Token 免费：GitHub → Settings → Developer settings → Personal access tokens。
-            </p>
+            <p class="settings-desc">{{ i18nT('settings_token_desc') }}</p>
             <div v-if="info?.has_token" class="settings-current">
-              当前生效：<code class="token-mask">{{ info.masked_token }}</code>
+              {{ i18nT('settings_token_current') }}：<code class="token-mask">{{ info.masked_token }}</code>
               <span class="dim">{{ i18nT('settings_token_masked') }}</span>
             </div>
             <div class="settings-row">
@@ -222,8 +220,8 @@ function close() {
                 spellcheck="false"
                 @keyup.enter="submit"
               />
-              <button class="btn" :disabled="saving || !tokenInput.trim()" @click="submit">保存并生效</button>
-              <button v-if="info?.has_token" class="btn ghost" :disabled="saving" @click="remove">清除 Token</button>
+              <button class="btn" :disabled="saving || !tokenInput.trim()" @click="submit">{{ i18nT('settings_token_save') }}</button>
+              <button v-if="info?.has_token" class="btn ghost" :disabled="saving" @click="remove">{{ i18nT('settings_token_clear') }}</button>
             </div>
             <div v-if="savedHint" class="settings-hint ok-hint">{{ savedHint }}</div>
           </div>
@@ -234,14 +232,14 @@ function close() {
             <div class="settings-rate">
               <div class="rate-item">
                 <span class="rate-label">{{ i18nT('settings_rate_search') }}</span>
-                <span class="rate-val">{{ info.search_rate_per_minute }} 次/分钟</span>
+                <span class="rate-val">{{ i18nT('settings_rate_per_min').replace('{n}', String(info.search_rate_per_minute)) }}</span>
               </div>
               <div class="rate-item">
                 <span class="rate-label">{{ i18nT('settings_rate_core') }}</span>
-                <span class="rate-val">{{ info.core_rate_per_hour }} 次/小时</span>
+                <span class="rate-val">{{ i18nT('settings_rate_per_hour').replace('{n}', String(info.core_rate_per_hour)) }}</span>
               </div>
             </div>
-            <p class="settings-desc">保存 Token 后此处数值立即变化，无需重启服务。</p>
+            <p class="settings-desc">{{ i18nT('settings_rate_desc') }}</p>
           </div>
         </div>
 
@@ -280,7 +278,7 @@ function close() {
             <div
               v-else-if="updateLine.cls === 'upd' && info.deployment === 'web'"
               class="settings-hint"
-            >本地网页部署不适用安装包更新——请拉取最新代码（git pull）后重启服务。</div>
+            >{{ i18nT('settings_about_web_hint') }}</div>
             <div class="settings-about-row">
               <span class="about-label">{{ i18nT('settings_about_repo') }}</span>
               <a
@@ -292,7 +290,7 @@ function close() {
               >{{ repoHost }}</a>
             </div>
             <div v-if="checkError" class="settings-hint">{{ checkError }}</div>
-            <p class="settings-desc">应用每 6 小时自动检查一次新版本；仓库地址可随时查看源码与发布说明。</p>
+            <p class="settings-desc">{{ i18nT('settings_about_desc') }}</p>
           </div>
         </div>
 
@@ -314,7 +312,7 @@ function close() {
                 <span class="model-source-open">{{ i18nT('settings_models_open') }}</span>
               </a>
             </div>
-            <p class="settings-desc">中转站用于获取大模型 API 密钥与接口地址（OpenAI 兼容格式）；列表仅供参考，请自行判断平台可靠性。</p>
+            <p class="settings-desc">{{ i18nT('settings_models_desc') }}</p>
           </div>
         </div>
       </template>
