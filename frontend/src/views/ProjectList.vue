@@ -11,6 +11,7 @@ import {
   type Project,
 } from '../api'
 import AppHeader from '../components/AppHeader.vue'
+import { t } from '../composables/useI18n'
 
 const route = useRoute()
 const router = useRouter()
@@ -45,9 +46,9 @@ fetchCategories()
   })
   .catch(() => { /* 后端暂不可用：保留内置兜底 */ })
 const LANGS = [
-  { value: '', label: '全部语言' },
-  { value: 'zh', label: '中文' },
-  { value: 'en', label: '英文' },
+  { value: '', label: () => t('filter_all_lang') },
+  { value: 'zh', label: () => t('filter_zh') },
+  { value: 'en', label: () => t('filter_en') },
 ]
 // 平台筛选：值与入库的 platforms JSON 数组取值一致（requirements 推断），与分类平级的独立维度
 const PLATFORMS = ['Windows', 'macOS', 'Linux', 'Android', 'iOS', 'Web', 'Docker']
@@ -258,12 +259,12 @@ function selectPlatform(p: string) {
 
 // ---- 排序下拉：自绘组件（原生 select 弹出 UI 不可控） ----
 const SORT_OPTIONS = [
-  { value: 'stars', label: 'Star 最多' },
-  { value: 'recent', label: '最近活跃' },
-  { value: 'new', label: '最近入库' },
+  { value: 'stars', label: () => t('sort_stars') },
+  { value: 'recent', label: () => t('sort_recent') },
+  { value: 'new', label: () => t('sort_new') },
 ]
 const sortOpen = ref(false)
-const sortLabel = computed(() => SORT_OPTIONS.find((o) => o.value === sort.value)?.label ?? 'Star 最多')
+const sortLabel = computed(() => SORT_OPTIONS.find((o) => o.value === sort.value)?.label() ?? t('sort_stars'))
 
 function toggleSort() {
   sortOpen.value = !sortOpen.value
@@ -364,12 +365,12 @@ onUnmounted(() => {
     <div v-if="dailyPick && dailyPick.items.length" class="picks-strip">
       <div class="picks-head">
         <div class="picks-title">
-          <span>每日精选</span>
+          <span>{{ t('daily_pick') }}</span>
           <span v-if="dailyPick.pick_date" class="picks-date">{{ dailyPick.pick_date }}</span>
         </div>
         <button class="picks-shuffle" :disabled="shuffleLoading" @click="shufflePick">
           <span class="picks-shuffle-icon" :class="{ spinning: shuffleLoading }">↻</span>
-          {{ shuffleLoading ? '换一批…' : '换一批' }}
+          {{ shuffleLoading ? t('loading') : t('shuffle') }}
         </button>
       </div>
       <div class="picks-list">
@@ -391,7 +392,7 @@ onUnmounted(() => {
     <!-- 筛选：分类 / 语言 / 新增 分组显示，搜索独立一行 -->
     <div class="filters">
       <div class="filter-group">
-        <span class="filter-label">分类</span>
+        <span class="filter-label">{{ t('filter_category') }}</span>
         <button
           v-for="c in CATEGORIES"
           :key="c"
@@ -399,30 +400,30 @@ onUnmounted(() => {
           :class="{ active: category === c }"
           @click="selectCategory(c)"
         >
-          {{ c || '全部' }}<span class="chip-count">{{ c ? (categoryCounts[c] ?? '') : total }}</span>
+          {{ c ? t('cat_' + c) : t('filter_all') }}<span class="chip-count">{{ c ? (categoryCounts[c] ?? '') : total }}</span>
         </button>
       </div>
       <div class="filter-group">
-        <span class="filter-label">语言</span>
+        <span class="filter-label">{{ t('filter_lang') }}</span>
         <button
           v-for="l in LANGS"
           :key="l.value"
           class="chip lang-chip"
           :class="{ active: isLangActive(l.value) }"
-          :title="l.value === 'zh' ? '中文友好项目：简介为中文，或对中文用户友好（含中文文档/界面）' : undefined"
+          :title="l.value === 'zh' ? t('filter_zh_friendly_tip') : undefined"
           @click="selectLang(l.value)"
         >
-          {{ l.label }}
+          {{ l.label() }}
         </button>
       </div>
       <div class="filter-group">
-        <span class="filter-label">新增</span>
+        <span class="filter-label">{{ t('filter_new') }}</span>
         <button class="chip new-chip" :class="{ active: onlyNew === 'new' }" @click="selectNew">
           新增
         </button>
       </div>
       <div class="filter-group">
-        <span class="filter-label">平台</span>
+        <span class="filter-label">{{ t('filter_platform') }}</span>
         <button
           v-for="p in PLATFORMS"
           :key="p"
@@ -435,16 +436,16 @@ onUnmounted(() => {
       </div>
     </div>
     <div class="search-row">
-      <span class="filter-label">搜索</span>
+      <span class="filter-label">{{ t('filter_search') }}</span>
       <div class="search-box">
-        <input ref="searchInput" v-model="keyword" class="search-input" placeholder="输入即搜：项目名 / 描述" @keyup.enter="searchNow" />
+        <input ref="searchInput" v-model="keyword" class="search-input" :placeholder="t('search_placeholder')" @keyup.enter="searchNow" />
       </div>
-      <button v-if="hasKeyword()" class="search-clear" title="清空" @click="clearKeyword">×</button>
+      <button v-if="hasKeyword()" class="search-clear" :title="t('search_clear')" @click="clearKeyword">×</button>
     </div>
 
     <!-- 排序 -->
     <div class="sort-row">
-      <span>排序：</span>
+      <span>{{ t('sort_label') }}</span>
       <div class="sort-select" :class="{ open: sortOpen }" @click="toggleSort">
         <span class="sort-value">{{ sortLabel }}</span>
         <span class="sort-caret" aria-hidden="true"></span>
@@ -456,24 +457,24 @@ onUnmounted(() => {
             :class="{ active: sort === o.value }"
             @click="pickSort(o.value)"
           >
-            {{ o.label }}
+            {{ o.label() }}
           </button>
         </div>
       </div>
-      <span>共 {{ total }} 个项目</span>
+      <span>{{ t('total_projects').replace('{n}', String(total)) }}</span>
     </div>
 
     <div v-if="error" class="error-banner">{{ error }}</div>
 
     <!-- 列表 -->
-    <div v-if="loading" class="empty">加载中…</div>
+    <div v-if="loading" class="empty">{{ t('loading') }}</div>
     <div v-else-if="projects.length === 0" class="empty">
       <template v-if="hasActiveFilters()">
-        没有匹配的项目——换个关键词或筛选条件试试，
-        <button class="link-btn" @click="clearFilters">查看全部</button>
+        {{ t('empty_no_match') }}
+        <button class="link-btn" @click="clearFilters">{{ t('view_all') }}</button>
       </template>
-      <template v-else-if="onlyNew === 'new'">近 72 小时暂无新增项目。可前往「采集中心」触发一轮搜索。</template>
-      <template v-else>暂无项目。可前往「采集中心」手动触发一轮搜索。</template>
+      <template v-else-if="onlyNew === 'new'">{{ t('empty_no_new') }}</template>
+      <template v-else>{{ t('empty_no_projects') }}</template>
     </div>
     <div v-else class="grid">
       <ProjectCard v-for="p in projects" :key="p.id" :project="p" />
@@ -481,10 +482,10 @@ onUnmounted(() => {
 
     <!-- 触底自动加载：滚动到列表底部自动追加下一页 -->
     <div v-if="total > projects.length" ref="sentinel" class="load-more">
-      <span class="hint">{{ loadingMore ? '加载中…' : `已加载 ${projects.length} / 共 ${total} 个项目` }}</span>
+      <span class="hint">{{ loadingMore ? t('loading') : t('loaded_part').replace('{a}', String(projects.length)).replace('{b}', String(total)) }}</span>
     </div>
     <div v-else-if="projects.length > 0" class="load-more">
-      <span class="hint">已全部加载（共 {{ total }} 个项目）</span>
+      <span class="hint">{{ t('loaded_all').replace('{n}', String(total)) }}</span>
     </div>
   </div>
 </template>

@@ -2340,6 +2340,28 @@ a:hover {
   margin-right: 10px;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
+/* 语言切换按钮：与主题按钮同规格（日夜按钮旁） */
+.lang-btn {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg-card);
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 8px;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.lang-btn:hover, .lang-btn.open {
+  border-color: var(--accent);
+  color: var(--accent-deep);
+  background: var(--accent-weak);
 .theme-btn:hover, .theme-btn.open {
   border-color: var(--accent);
   color: var(--accent-deep);

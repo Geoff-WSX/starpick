@@ -17,6 +17,7 @@ import RoundsModal from './RoundsModal.vue'
 import SettingsModal from './SettingsModal.vue'
 import UpdatesModal from './UpdatesModal.vue'
 import { useClickOutside } from '../composables/useClickOutside'
+import { t, currentLang, toggleLang } from '../composables/useI18n'
 
 const router = useRouter()
 const health = ref<HealthResponse | null>(null)
@@ -202,15 +203,15 @@ onUnmounted(() => {
     <div class="status">
       <span class="dot" :class="health?.status === 'ok' ? 'ok' : health ? 'err' : ''"></span>
       <span>
-        后端 {{ health?.status === 'ok' ? '在线' : health ? '异常' : '连接中…' }}
+        {{ health?.status === 'ok' ? t('header_status_online') : health ? t('header_status_err') : t('header_status_connecting') }}
         <template v-if="probePending > 0">
-          · 安装包检测 {{ probeTotal - probePending }}/{{ probeTotal }}<template v-if="health && health.has_token === false">（未配 Token，速度受限）</template>
+          · {{ t('header_pkg_detect') }} {{ probeTotal - probePending }}/{{ probeTotal }}<template v-if="health && health.has_token === false">{{ t('header_no_token_slow') }}</template>
         </template>
       </span>
     </div>
     <!-- 右侧入口：功能下拉菜单（收藏 / 采集中心 / 采集历史 / 更新历史） -->
     <div ref="toolsWrapEl" class="tools-wrap">
-      <button class="tools-trigger" :class="{ open: toolsMenuOpen }" title="功能菜单" @click="toggleTools">
+      <button class="tools-trigger" :class="{ open: toolsMenuOpen }" :title="t('header_tools')" @click="toggleTools">
         <svg class="tools-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3.5" y="3.5" width="7" height="7" rx="1.8" />
           <rect x="13.5" y="3.5" width="7" height="7" rx="1.8" />
@@ -219,15 +220,15 @@ onUnmounted(() => {
         </svg>
       </button>
       <div v-if="toolsMenuOpen" class="tools-menu">
-        <button class="tools-menu-item" @click="openModal('fav')">收藏</button>
-        <button class="tools-menu-item" @click="openModal('collect')">采集中心</button>
-        <button class="tools-menu-item" @click="openModal('rounds')">采集历史</button>
-        <button class="tools-menu-item" @click="openModal('updates')">更新历史</button>
-        <button class="tools-menu-item" @click="openModal('cleanup')">清除分类项目</button>
+        <button class="tools-menu-item" @click="openModal('fav')">{{ t('header_fav') }}</button>
+        <button class="tools-menu-item" @click="openModal('collect')">{{ t('header_collect') }}</button>
+        <button class="tools-menu-item" @click="openModal('rounds')">{{ t('header_rounds') }}</button>
+        <button class="tools-menu-item" @click="openModal('updates')">{{ t('header_updates') }}</button>
+        <button class="tools-menu-item" @click="openModal('cleanup')">{{ t('header_cleanup') }}</button>
       </div>
     </div>
     <!-- 设置：GitHub Token 热生效配置 -->
-    <button class="tools-trigger settings-btn" :class="{ open: settingsOpen }" title="设置" @click="openModal('settings')">
+    <button class="tools-trigger settings-btn" :class="{ open: settingsOpen }" :title="t('header_settings')" @click="openModal('settings')">
       <svg class="tools-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <path d="M4 7h16M4 12h16M4 17h16" />
         <circle cx="9" cy="7" r="2.2" fill="var(--bg-card)" />
@@ -235,8 +236,12 @@ onUnmounted(() => {
         <circle cx="8" cy="17" r="2.2" fill="var(--bg-card)" />
       </svg>
     </button>
+    <!-- 语言切换：中文 / English（与日夜按钮并列） -->
+    <button class="lang-btn" :title="t('header_lang')" @click="toggleLang">
+      {{ currentLang === 'zh' ? 'EN' : '中' }}
+    </button>
     <!-- 日/夜切换：图标随当前主题变化 -->
-    <button class="theme-btn" :class="{ open: theme === 'light' }" :title="theme === 'dark' ? '切换到日间模式' : '切换到深空星图'" @click="toggleTheme">
+    <button class="theme-btn" :class="{ open: theme === 'light' }" :title="theme === 'dark' ? t('header_theme_light') : t('header_theme_dark')" @click="toggleTheme">
       <svg v-if="theme === 'dark'" class="theme-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="4" />
         <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
@@ -247,7 +252,7 @@ onUnmounted(() => {
     </button>
     <!-- 通知铃铛：与导航栏保持间距 -->
     <div ref="bellWrapEl" class="bell-wrap">
-      <button class="bell-btn" :class="{ open: notifOpen }" title="通知中心" @click="toggleNotif">
+      <button class="bell-btn" :class="{ open: notifOpen }" :title="t('header_notif')" @click="toggleNotif">
         <svg class="bell-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
@@ -256,10 +261,10 @@ onUnmounted(() => {
       </button>
       <div v-if="notifOpen" class="notif-panel">
         <div class="notif-head">
-          <span>通知中心</span>
-          <button class="btn ghost small" :disabled="unreadCount === 0" @click="readAll">全部已读</button>
+          <span>{{ t('header_notif') }}</span>
+          <button class="btn ghost small" :disabled="unreadCount === 0" @click="readAll">{{ t('header_notif_read_all') }}</button>
         </div>
-        <div v-if="notifications.length === 0" class="empty">暂无通知</div>
+        <div v-if="notifications.length === 0" class="empty">{{ t('header_notif_empty') }}</div>
         <div v-else class="notif-list">
           <div
             v-for="n in notifications"
@@ -279,11 +284,11 @@ onUnmounted(() => {
         <!-- 加载更多 -->
         <div v-if="notifications.length > 0 && !notifLoadedAll" class="notif-more">
           <button class="btn ghost small" :disabled="notifLoading" @click="loadMoreNotifs">
-            {{ notifLoading ? '加载中…' : '加载更多' }}
+            {{ notifLoading ? t('header_notif_loading') : t('header_notif_more') }}
           </button>
         </div>
         <div v-else-if="notifications.length > 0 && notifLoadedAll" class="notif-more dim">
-          已显示全部通知
+          {{ t('header_notif_all') }}
         </div>
       </div>
     </div>
