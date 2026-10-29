@@ -5,6 +5,7 @@ import {
   fetchSettings, saveToken, clearToken, checkAppUpdate, fetchAppUpdateDownload, openExternal,
   type SettingsState,
 } from '../api'
+import { t as i18nT } from '../composables/useI18n'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -29,7 +30,7 @@ async function load() {
   try {
     info.value = await fetchSettings()
   } catch (e) {
-    error.value = e instanceof Error ? e.message : '读取设置失败'
+    error.value = e instanceof Error ? e.message : i18nT('settings_read_fail')
   } finally {
     loading.value = false
   }
@@ -56,9 +57,9 @@ async function submit() {
   try {
     info.value = await saveToken(t)
     tokenInput.value = ''
-    savedHint.value = '已保存并立即生效（无需重启）'
+    savedHint.value = i18nT('settings_saved')
   } catch (e) {
-    error.value = e instanceof Error ? e.message : '保存失败'
+    error.value = e instanceof Error ? e.message : i18nT('settings_save_fail')
   } finally {
     saving.value = false
   }
@@ -69,9 +70,9 @@ async function remove() {
   error.value = ''
   try {
     info.value = await clearToken()
-    savedHint.value = '已清除，回退匿名模式'
+    savedHint.value = i18nT('settings_cleared')
   } catch (e) {
-    error.value = e instanceof Error ? e.message : '清除失败'
+    error.value = e instanceof Error ? e.message : i18nT('settings_clear_fail')
   } finally {
     saving.value = false
   }
@@ -96,9 +97,9 @@ async function runCheck() {
       info.value = fresh
     }
     // 超时：后台检查未完成（网络慢），提示稍后重开弹窗查看
-    checkError.value = '网络较慢，稍后重新打开设置查看结果'
+    checkError.value = i18nT('settings_check_slow')
   } catch (e) {
-    checkError.value = e instanceof Error ? e.message : '检查更新失败'
+    checkError.value = e instanceof Error ? e.message : i18nT('settings_check_fail')
   } finally {
     checking.value = false
   }
@@ -107,11 +108,11 @@ async function runCheck() {
 /** 「关于」检查更新行的状态文案与样式 */
 const updateLine = computed(() => {
   const u = info.value?.app_update
-  if (checking.value) return { text: '检查中…', cls: 'dim' }
-  if (!u || u.status === 'none') return { text: '尚未检查', cls: 'dim' }
-  if (u.status === 'up_to_date') return { text: `已是最新（${u.latest_tag || `v${info.value?.version}`}）`, cls: 'ok' }
-  if (u.status === 'newer') return { text: `发现新版本 ${u.latest_tag}`, cls: 'upd' }
-  return { text: '暂无法检查更新', cls: 'dim' }
+  if (checking.value) return { text: i18nT('settings_checking'), cls: 'dim' }
+  if (!u || u.status === 'none') return { text: i18nT('settings_not_checked'), cls: 'dim' }
+  if (u.status === 'up_to_date') return { text: i18nT('settings_up_to_date').replace('{tag}', u.latest_tag || `v${info.value?.version}`), cls: 'ok' }
+  if (u.status === 'newer') return { text: i18nT('settings_newer').replace('{tag}', u.latest_tag), cls: 'upd' }
+  return { text: i18nT('settings_check_unknown'), cls: 'dim' }
 })
 
 const repoHost = computed(() => {
@@ -130,14 +131,14 @@ async function oneClickUpdate() {
     const bridge = (window as { pywebview?: { api?: { update_and_exit?: (u: string, n: string) => string } } })
       .pywebview?.api
     if (!bridge?.update_and_exit) {
-      updateError.value = '当前非桌面壳环境，无法一键更新'
+      updateError.value = i18nT('settings_not_desktop')
       return
     }
     const err = bridge.update_and_exit(r.download_url, r.file_name)
     if (err) updateError.value = err
     // 成功后桌面壳自行退出，无需处理
   } catch (e) {
-    updateError.value = e instanceof Error ? e.message : '一键更新失败'
+    updateError.value = e instanceof Error ? e.message : i18nT('settings_update_fail')
   } finally {
     updating.value = false
   }
@@ -148,10 +149,11 @@ interface ModelSourceLink {
   label: string
   signupUrl: string
 }
-const MODEL_SOURCE_LINKS: ModelSourceLink[] = [
-  { label: '芯谷 AI（国内模型）', signupUrl: 'https://api.xingu-ai.com/sign-up?aff=iC5W' },
-  { label: '芯谷 AI（国外模型）', signupUrl: 'https://www.xinguhub.com/sign-up?aff=lyKd' },
-]
+// computed：语言切换时重新求值（常量会在模块加载时定死语言）
+const MODEL_SOURCE_LINKS = computed<ModelSourceLink[]>(() => [
+  { label: i18nT('settings_model_domestic'), signupUrl: 'https://api.xingu-ai.com/sign-up?aff=iC5W' },
+  { label: i18nT('settings_model_global'), signupUrl: 'https://www.xinguhub.com/sign-up?aff=lyKd' },
+])
 
 function close() {
   emit('close')
@@ -162,15 +164,15 @@ function close() {
   <div v-if="open" class="modal-overlay" @click.self="close">
     <div class="modal">
       <div class="modal-head">
-        <h2>设置</h2>
-        <button class="modal-close" title="关闭" @click="close">
+        <h2>{{ i18nT('settings_title') }}</h2>
+        <button class="modal-close" :title="i18nT('settings_close')" @click="close">
           <svg class="modal-close-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         </button>
       </div>
 
-      <div v-if="loading" class="empty">加载中…</div>
+      <div v-if="loading" class="empty">{{ i18nT('settings_loading') }}</div>
       <div v-else-if="error" class="error-banner">{{ error }}</div>
       <template v-else>
         <div class="settings-tabs" role="tablist">
@@ -179,28 +181,28 @@ function close() {
             :class="{ active: tab === 'tab' }"
             :aria-selected="tab === 'tab'"
             @click="tab = 'tab'"
-          >配置</button>
+          >{{ i18nT('settings_tab_config') }}</button>
           <button
             class="settings-tab" role="tab"
             :class="{ active: tab === 'about' }"
             :aria-selected="tab === 'about'"
             @click="tab = 'about'"
-          >关于</button>
+          >{{ i18nT('settings_tab_about') }}</button>
           <button
             class="settings-tab" role="tab"
             :class="{ active: tab === 'models' }"
             :aria-selected="tab === 'models'"
             @click="tab = 'models'"
-          >模型中转站</button>
+          >{{ i18nT('settings_tab_models') }}</button>
         </div>
 
         <div v-show="tab === 'tab'" class="settings-body">
           <!-- GitHub Token 配置 -->
           <div class="settings-group">
             <div class="settings-title">
-              <span>GitHub Token</span>
+              <span>{{ i18nT('settings_token_title') }}</span>
               <span class="tag" :class="{ upd: info?.has_token }">
-                {{ info?.has_token ? '已配置' : '未配置（匿名模式）' }}
+                {{ info?.has_token ? i18nT('settings_token_configured') : i18nT('settings_token_none') }}
               </span>
             </div>
             <p class="settings-desc">
@@ -208,14 +210,14 @@ function close() {
             </p>
             <div v-if="info?.has_token" class="settings-current">
               当前生效：<code class="token-mask">{{ info.masked_token }}</code>
-              <span class="dim">（仅显示部分字符）</span>
+              <span class="dim">{{ i18nT('settings_token_masked') }}</span>
             </div>
             <div class="settings-row">
               <input
                 v-model="tokenInput"
                 class="settings-input"
                 type="password"
-                placeholder="粘贴 GitHub Token（ghp_…）"
+                :placeholder="i18nT('settings_token_placeholder')"
                 autocomplete="off"
                 spellcheck="false"
                 @keyup.enter="submit"
@@ -228,14 +230,14 @@ function close() {
 
           <!-- 限流状态 -->
           <div class="settings-group" v-if="info">
-            <div class="settings-title"><span>当前限流</span></div>
+            <div class="settings-title"><span>{{ i18nT('settings_rate_title') }}</span></div>
             <div class="settings-rate">
               <div class="rate-item">
-                <span class="rate-label">搜索请求</span>
+                <span class="rate-label">{{ i18nT('settings_rate_search') }}</span>
                 <span class="rate-val">{{ info.search_rate_per_minute }} 次/分钟</span>
               </div>
               <div class="rate-item">
-                <span class="rate-label">普通请求</span>
+                <span class="rate-label">{{ i18nT('settings_rate_core') }}</span>
                 <span class="rate-val">{{ info.core_rate_per_hour }} 次/小时</span>
               </div>
             </div>
@@ -246,25 +248,25 @@ function close() {
         <div v-show="tab === 'about'" class="settings-body">
           <!-- 关于 -->
           <div class="settings-group" v-if="info">
-            <div class="settings-title"><span>关于</span></div>
+            <div class="settings-title"><span>{{ i18nT('settings_tab_about') }}</span></div>
             <div class="settings-about-row">
-              <span class="about-label">当前版本</span>
+              <span class="about-label">{{ i18nT('settings_about_cur_ver') }}</span>
               <span class="about-val mono">v{{ info.version }}</span>
             </div>
             <div class="settings-about-row">
-              <span class="about-label">检查更新</span>
+              <span class="about-label">{{ i18nT('settings_about_check') }}</span>
               <span class="about-val" :class="updateLine.cls">{{ updateLine.text }}</span>
               <button class="btn small" :disabled="checking" @click="runCheck">
-                {{ checking ? '检查中…' : '立即检查' }}
+                {{ checking ? i18nT('settings_checking') : i18nT('settings_about_check_now') }}
               </button>
             </div>
             <div
               v-if="updateLine.cls === 'upd' && info.deployment === 'desktop'"
               class="settings-about-row"
             >
-              <span class="about-label">一键更新</span>
+              <span class="about-label">{{ i18nT('settings_about_oneclick') }}</span>
               <button class="btn small" :disabled="updating" @click="oneClickUpdate">
-                {{ updating ? '下载并安装中…' : '下载并自动更新' }}
+                {{ updating ? i18nT('settings_about_downloading') : i18nT('settings_about_download') }}
               </button>
               <a
                 class="settings-link"
@@ -272,7 +274,7 @@ function close() {
                 target="_blank"
                 rel="noopener"
                 @click.prevent="openExternal(info.repo_url + '/releases/latest')"
-              >手动下载 ↗</a>
+              >{{ i18nT('settings_about_manual') }}</a>
             </div>
             <div v-if="updateError" class="settings-hint">{{ updateError }}</div>
             <div
@@ -280,7 +282,7 @@ function close() {
               class="settings-hint"
             >本地网页部署不适用安装包更新——请拉取最新代码（git pull）后重启服务。</div>
             <div class="settings-about-row">
-              <span class="about-label">项目地址</span>
+              <span class="about-label">{{ i18nT('settings_about_repo') }}</span>
               <a
                 class="settings-link mono"
                 :href="info.repo_url"
@@ -297,7 +299,7 @@ function close() {
         <div v-show="tab === 'models'" class="settings-body">
           <!-- 模型中转站推荐：点击直接跳转注册/开通页 -->
           <div class="settings-group">
-            <div class="settings-title"><span>模型中转站推荐</span></div>
+            <div class="settings-title"><span>{{ i18nT('settings_models_title') }}</span></div>
             <div class="model-source-list">
               <a
                 v-for="src in MODEL_SOURCE_LINKS"
@@ -309,7 +311,7 @@ function close() {
                 @click.prevent="openExternal(src.signupUrl)"
               >
                 <span class="model-source-name">{{ src.label }}</span>
-                <span class="model-source-open">前往开通 ↗</span>
+                <span class="model-source-open">{{ i18nT('settings_models_open') }}</span>
               </a>
             </div>
             <p class="settings-desc">中转站用于获取大模型 API 密钥与接口地址（OpenAI 兼容格式）；列表仅供参考，请自行判断平台可靠性。</p>
