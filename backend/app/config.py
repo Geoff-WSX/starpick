@@ -25,6 +25,9 @@ RUNTIME_TOKEN_FILE = paths.runtime_token_path()   # 前端设置页写入（权�
 
 TOKEN_PATTERN = re.compile(r"(ghp_|github_pat_|gho_|ghu_)[A-Za-z0-9_]+")
 
+# 已实现客户端的平台标识（新增平台时同步 app/platforms/__init__.py 的注册表与这里）
+KNOWN_SOURCES: frozenset[str] = frozenset({"github", "codeberg"})
+
 
 def is_valid_token(token: str) -> bool:
     """Token 格式校验：GitHub 个人访问令牌前缀。"""
@@ -112,6 +115,15 @@ class Config:
     max_inactive_days: int = 90
     zh_weight: float = 1.2
     require_zh: bool = False
+
+    # ---- 多平台来源（2026-11 起） ----
+    # 各平台星数量级差异极大：Codeberg 全站最高约 7k，绝大多数项目 < 500 星，
+    # 套用 GitHub 的 min_stars 会把 Codeberg 候选全部过滤掉。故按来源分别配置阈值。
+    # enabled_sources 只影响采集轮跑哪些平台；github 必在其中（存量数据来源）。
+    enabled_sources: list[str] = field(default_factory=lambda: ["github"])
+    source_min_stars: dict[str, int] = field(
+        default_factory=lambda: {"github": 200, "codeberg": 20, "gitee": 100}
+    )
 
     re_recommend_on_major_update: bool = True
     rounds_retention: int = 90
@@ -218,6 +230,28 @@ def load_config(path: Path | str | None = None) -> Config:
     cfg.rounds_retention = int(dd.get("rounds_retention", cfg.rounds_retention))
     cfg.skip_existing_days = int(dd.get("skip_existing_days", cfg.skip_existing_days))
 
+    # sources：多平台采集开关与各平台星数阈值
+    src = raw.get("sources", {}) if isinstance(raw.get("sources", {}), dict) else {}
+    if "enabled" in src:
+        raw_enabled = src.get("enabled")
+        if isinstance(raw_enabled, list):
+            cfg.enabled_sources = [str(s).strip() for s in raw_enabled if str(s).strip()]
+        elif isinstance(raw_enabled, str):
+            cfg.enabled_sources = [s.strip() for s in raw_enabled.split(",") if s.strip()]
+    # github 必须在列表里：存量库与「发现轮」都依赖 GitHub，移除会让首页数据停更
+    if "github" not in cfg.enabled_sources:
+        cfg.enabled_sources.insert(0, "github")
+    raw_thresholds = src.get("min_stars")
+    if isinstance(raw_thresholds, dict):
+        merged = dict(cfg.source_min_stars)
+        for key, val in raw_thresholds.items():
+            try:
+                merged[str(key)] = int(val)
+            except (TypeError, ValueError):
+                # 非法值静默忽略（保留默认阈值），具体报错留给 validate 的统一校验
+                pass
+        cfg.source_min_stars = merged
+
     # categories
     cats = raw.get("categories", {})
     if isinstance(cats, dict):
@@ -250,6 +284,16 @@ def validate(cfg: Config) -> None:
         errors.append("github.retry_max: 必须 >= 0")
     if cfg.concurrency < 1 or cfg.concurrency > 32:
         errors.append("github.concurrency: 建议范围 1-32")
+    # sources：平台标识必须是已实现的客户端（拼错会让采集静默跳过该平台）
+    for src_name in cfg.enabled_sources:
+        if src_name not in KNOWN_SOURCES:
+            errors.append(
+                f"sources.enabled: 未知平台「{src_name}」"
+                f"（支持：{', '.join(sorted(KNOWN_SOURCES))}）"
+            )
+    for src_name, threshold in cfg.source_min_stars.items():
+        if threshold < 0:
+            errors.append(f"sources.min_stars.{src_name}: 必须 >= 0")
     if cfg.effective_token and not is_valid_token(cfg.effective_token):
         errors.append("github.token_env: 引用的 Token 格式非法（应以 ghp_/github_pat_ 等开头）")
     if errors:

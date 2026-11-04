@@ -22,6 +22,9 @@ from typing import Any
 from .config import Config
 from .db import Database
 from .github_api import GitHubClient, GitHubError
+from .platforms import (
+    SOURCE_LABELS, PlatformError, build_platform_clients, qualify, split_qualified,
+)
 from .requirements import detect_zh_friendly, extract_system_requirements, infer_platforms, major_version_of
 
 log = logging.getLogger("kazumi.collector")
@@ -354,6 +357,9 @@ class Collector:
         self.cfg = cfg
         self.db = db
         self.client = client or GitHubClient(cfg)
+        # 多平台客户端字典（source → client）：github 复用 self.client（带 Token 与限流器），
+        # 其它平台按 cfg.enabled_sources 实例化。collector 主流程按此循环。
+        self.clients = build_platform_clients(cfg, self.client)
         self._run_lock = threading.Lock()
         self._backfill_futures: set = set()
         self._backfill_all_lock = threading.Lock()
@@ -364,6 +370,10 @@ class Collector:
     def apply_token(self, token: str) -> None:
         """热更新 GitHub Token（前端设置页保存后立即生效，无需重启）。"""
         self.client.apply_token(token)
+
+    def _client_for(self, source: str):
+        """取某来源的平台客户端；未启用的来源返回 None（调用方跳过）。"""
+        return self.clients.get(source or "github")
 
     # ---------------- 防重入（检查 + 建轮次原子化） ----------------
     def _acquire_run(self, source: str = "manual") -> int | None:
@@ -464,8 +474,9 @@ class Collector:
         categories_total = len(cats)
         # 合并/过滤后的分类总数写回进度（collect_once 的 start 只登记内置数）
         self.progress.set(categories_total=categories_total)
-        # 手动触发可覆盖过滤阈值（None=用配置默认值；0=不限）
-        min_stars = self.cfg.min_stars if min_stars is None else min_stars
+        # 手动触发可覆盖过滤阈值：None=按各平台自己的配置阈值（source_min_stars）；
+        # 0=不限；>0=所有平台统一用该值（界面上「最低 star」填了数就是全局覆盖）
+        explicit_min_stars = min_stars
         per_cat = (
             self.cfg.per_category_top
             if per_category_top is None or per_category_top <= 0
@@ -485,45 +496,69 @@ class Collector:
         # "streamed from disk" 的 MoE 引擎当流媒体收进影视——搜索结果必须本地过关键词
         all_patterns = self._category_patterns()
         total_dropped = 0
-        for category, keywords in cats.items():
-            self.progress.set(
-                message=f"正在搜索分类「{category}」",
-                current_category=category,
-            )
-            queries = build_category_queries(keywords, min_stars, pushed_cutoff)
-            if not queries:
-                done += 1
-                self.progress.set(categories_done=done)
-                continue
-            cat_hits: list[dict] = []
-            for query in queries:
+        # 本轮参与采集的平台（github 恒在，其余按 cfg.enabled_sources）
+        sources = [s for s in self.cfg.enabled_sources if self._client_for(s)]
+        # 进度分母 = 分类数 × 平台数（多平台时进度条按「分类×平台」推进）
+        categories_total *= len(sources)
+        self.progress.set(categories_total=categories_total)
+        for src in sources:
+            client = self._client_for(src)
+            src_min_stars = self._source_min_stars(src, explicit_min_stars)
+            label = f"（{SOURCE_LABELS.get(src, src)}）" if len(sources) > 1 else ""
+            if src == "github":
+                # GitHub 按分类逐个搜索（每分类一条查询构造，召回率最高）
+                per_category_items = None
+            else:
+                # 非 GitHub 平台走「全站榜单 + 本地归类」：榜单一次拉取后在本地
+                # 分发给各分类（Codeberg 按分类关键词搜只能捞到低星凑数仓库，
+                # 详见 platforms/codeberg.py 的说明）。避免同一份榜单被拉 12 次。
+                self.progress.set(
+                    message=f"正在拉取榜单{label}…",
+                    current_category="",
+                )
                 try:
-                    items = self.client.search_repositories(
-                        query, per_page=100, max_items=per_cat
+                    per_category_items = client.search_repositories(
+                        [], min_stars=src_min_stars, per_page=50,
+                        max_items=per_cat * 4,
                     )
-                except GitHubError as exc:
-                    log.error("分类 %s 搜索失败: %s", category, exc)
-                    continue
-                for it in items:
-                    full_name = it.get("full_name", "")
-                    if not full_name:
-                        continue
-                    cat_patterns = [(name, p) for name, p in all_patterns if name == category]
-                    if cat_patterns and not _match_categories(it, cat_patterns):
-                        total_dropped += 1
-                        continue
-                    cat_hits.append(_to_candidate(it, category))
-            # 每分类按 star 预排后全量纳入（受本轮 per_cat 上限约束）
-            cat_hits.sort(key=lambda c: c["stars"], reverse=True)
-            picked = cat_hits[:per_cat]
-            candidates.extend(picked)
-            categories_summary[category] = len(picked)
-            log.info("分类 %s 候选 %d 个", category, len(picked))
-            done += 1
-            self.progress.set(
-                categories_done=done,
-                message=f"分类搜索完成 {done}/{categories_total}",
-            )
+                    log.info("榜单拉取完成%s：%d 个项目", label, len(per_category_items))
+                except PlatformError as exc:
+                    log.error("榜单拉取失败%s: %s", label, exc)
+                    per_category_items = []
+                categories_summary.setdefault(f"__{src}_total__", len(per_category_items))
+            for category, keywords in cats.items():
+                self.progress.set(
+                    message=f"正在分类「{category}」{label}" if per_category_items is None
+                            else f"正在归类「{category}」{label}",
+                    current_category=category,
+                )
+                hits, dropped = self._search_category(
+                    client, src, category, keywords,
+                    src_min_stars, pushed_cutoff, per_cat, all_patterns,
+                    preloaded=per_category_items,
+                )
+                total_dropped += dropped
+                # 每分类按 star 预排后全量纳入（受本轮 per_cat 上限约束）
+                hits.sort(key=lambda c: c["stars"], reverse=True)
+                picked = hits[:per_cat]
+                # 跨界项目：同一项目可命中多个分类。全部保留给 _store 处理——
+                # 它会把后续命中的分类并入「附加分类」（categories 数组），
+                # 只入库一次、README 也只抓一次（见 _store 的 project_exists 分支）。
+                # 因此这里**不能**按 full_name 去重，否则跨界标注能力会丢失。
+                candidates.extend(picked)
+                # 分类统计累加（多平台同名分类合并计数）
+                categories_summary[category] = (
+                    categories_summary.get(category, 0) + len(picked)
+                )
+                log.info("分类 %s（%s）候选 %d 个", category, src, len(picked))
+                done += 1
+                self.progress.set(
+                    categories_done=done,
+                    message=f"分类搜索完成 {done}/{categories_total}",
+                )
+        # 内部统计键（平台榜单总数）不对外暴露
+        for key in [k for k in categories_summary if k.startswith("__")]:
+            categories_summary.pop(key)
 
         if total_dropped:
             log.info("本地复检：丢弃 %d 条词干/分词误伤的搜索结果", total_dropped)
@@ -538,7 +573,8 @@ class Collector:
 
         to_enrich, self._last_skipped_fresh = self._skip_fresh(candidates)
         enriched = self._enrich(to_enrich)       # 并发抓 README（快，不受 release 限流拖累）
-        enriched = self._filter_stars(enriched, min_stars)  # 代码层热度兜底（用本轮生效阈值）
+        # 代码层热度兜底：按来源各自的阈值（Codeberg 20 星 ≠ GitHub 200 星）
+        enriched = self._filter_stars(enriched, explicit_min_stars)
         self.progress.set(phase="storing", message="正在入库与去重…")
         inserted, updated, skipped, stored = self._store(enriched, round_id)
         self._start_backfill(enriched)           # release assets/直链 后台异步补全（含已入库项目）
@@ -555,12 +591,97 @@ class Collector:
                 "skipped_fresh": self._last_skipped_fresh,
                 "duration_sec": round(time.monotonic() - self._t0, 1) if hasattr(self, "_t0") else 0,
                 "filter_used": {
-                    "min_stars": min_stars,
+                    # 保持标量语义（历史契约：手动覆盖值或 GitHub 默认阈值）；
+                    # 多平台时各平台阈值在 source_min_stars 里另给，互不干扰
+                    "min_stars": (
+                        explicit_min_stars
+                        if explicit_min_stars is not None
+                        else self.cfg.source_min_stars.get("github", self.cfg.min_stars)
+                    ),
+                    "source_min_stars": {
+                        s: self._source_min_stars(s, explicit_min_stars) for s in sources
+                    },
                     "max_inactive_days": max_days,
                     "per_category_max": per_cat,
                 },
             },
         }
+
+    def _source_min_stars(self, source: str, explicit: int | None) -> int:
+        """该来源本轮生效的 star 阈值。
+
+        `explicit` 为用户手动指定：0 表示「不限」（所有平台一起放开），
+        正数表示所有平台统一用该值。None 则按 `source_min_stars` 各平台默认。
+        """
+        if explicit is not None:
+            return explicit
+        return self.cfg.source_min_stars.get(source, self.cfg.min_stars)
+
+    def _search_category(
+        self, client, source: str, category: str, keywords: list[str],
+        min_stars: int, pushed_cutoff: str | None, per_cat: int,
+        all_patterns: list[tuple[str, list]],
+        preloaded: list[dict] | None = None,
+    ) -> tuple[list[dict], int]:
+        """单个平台 + 单个分类的搜索与本地复检。
+
+        返回 (命中的候选列表, 被复检丢弃的条数)。平台差异（查询语法、翻页上限、
+        多词短语行为）由各平台客户端吸收，这里只处理 GitHub 语义的统一结果。
+
+        `preloaded` 非空时复用已拉取的平台榜单（非 GitHub 平台的「一次拉取、多次
+        分发」路径），不再发请求。注意：本地复检仍需逐分类做——同一份榜单里的
+        项目会命中不同分类，二分类统计靠复检结果决定归属。
+        """
+        if preloaded is not None:
+            raw_items = preloaded
+        elif source == "github":
+            # GitHub 走既有的查询构造（引号短语 / 词形变体 / stars:>=N 限定）
+            queries = build_category_queries(keywords, min_stars, pushed_cutoff)
+            if not queries:
+                return [], 0
+            items: list[dict] = []
+            for query in queries:
+                try:
+                    items.extend(
+                        self.client.search_repositories(query, per_page=100,
+                                                        max_items=per_cat)
+                    )
+                except GitHubError as exc:
+                    log.error("分类 %s 搜索失败: %s", category, exc)
+            raw_items = items
+        else:
+            # 其它平台：关键词原样交给客户端（Codeberg 当前实现忽略关键词走榜单）
+            try:
+                raw_items = client.search_repositories(
+                    keywords, min_stars=min_stars, per_page=50, max_items=per_cat,
+                )
+            except PlatformError as exc:
+                log.error("分类 %s（%s）搜索失败: %s", category, source, exc)
+                return [], 0
+
+        cat_patterns = [(name, p) for name, p in all_patterns if name == category]
+        # 榜单模式（preloaded）下分类模式必须存在：那是本地归类的唯一依据。
+        # 空模式若走「全部通过」，所有分类都会收下整个榜单（每个分类 1000 条假候选）。
+        # GitHub 的查询式搜索不受此限——搜索结果本身就是「命中」的语义。
+        if preloaded is not None and not cat_patterns:
+            return [], 0
+        hits: list[dict] = []
+        dropped = 0
+        for it in raw_items:
+            full_name = it.get("full_name", "")
+            if not full_name:
+                continue
+            # 本地复检：平台搜索的宽泛匹配（词干/短语包含）必须命中分类关键词
+            if cat_patterns and not _match_categories(it, cat_patterns):
+                dropped += 1
+                continue
+            cand = _to_candidate(it, category)
+            cand["source"] = source
+            # 入库主键带平台前缀（非 GitHub），避免跨平台重名撞 UNIQUE
+            cand["full_name"] = qualify(source, full_name)
+            cand["bare_name"] = full_name
+            hits.append(cand)
+        return hits, dropped
 
     # ---------------- 发现轮（轻量）：只搜近期创建的高星新仓库 ----------------
     def _category_patterns(self) -> list[tuple[str, list]]:
@@ -716,21 +837,42 @@ class Collector:
         return results
 
     def _enrich_one(self, cand: dict) -> dict:
-        """抓 README 原文 + 项目自带多语言变体（快）；release 直链由 _backfill_one 后台补全。"""
+        """抓 README 原文 + 项目自带多语言变体（快）；release 直链由 _backfill_one 后台补全。
+
+        平台差异：GitHub 走 `get_readme_bundle`（多语言变体探测）；其它平台只取
+        默认 README（Codeberg 上中英变体极少，全量探测会白耗配额）。
+        """
         full_name = cand["full_name"]
-        try:
-            bundle = self.client.get_readme_bundle(full_name)
-            readme = bundle.get("default")
-            cand["readme_zh"] = bundle.get("zh") or ""
-            cand["readme_en"] = bundle.get("en") or ""
-            cand["readme_variants"] = _variants_json(bundle)
-            cand["ml_probed"] = 1
-            cand["ml_variants_at"] = _utc_now()
-        except GitHubError as exc:
-            log.warning("README 抓取失败 %s: %s", full_name, exc)
+        source = cand.get("source") or "github"
+        bare = cand.get("bare_name") or split_qualified(full_name)[1]
+        if source == "github":
+            try:
+                bundle = self.client.get_readme_bundle(full_name)
+                readme = bundle.get("default")
+                cand["readme_zh"] = bundle.get("zh") or ""
+                cand["readme_en"] = bundle.get("en") or ""
+                cand["readme_variants"] = _variants_json(bundle)
+                cand["ml_probed"] = 1
+                cand["ml_variants_at"] = _utc_now()
+            except GitHubError as exc:
+                log.warning("README 抓取失败 %s: %s", full_name, exc)
+                readme = None
+                cand["readme_zh"] = ""
+                cand["readme_en"] = ""
+        else:
+            client = self._client_for(source)
             readme = None
+            if client is not None:
+                try:
+                    readme = client.get_readme(bare)
+                except Exception as exc:  # 单仓失败不影响整轮
+                    log.warning("README 抓取失败 %s/%s: %s", source, bare, exc)
             cand["readme_zh"] = ""
             cand["readme_en"] = ""
+            # 标记为「已探测」（无变体可探）：避免启动时的全语言回填反复扫这些项目
+            cand["readme_variants"] = "{}"
+            cand["ml_probed"] = 1
+            cand["ml_variants_at"] = _utc_now()
 
         cand["readme"] = readme or ""
         cand["platforms"] = infer_platforms([], cand["readme"])
@@ -767,12 +909,22 @@ class Collector:
         - assets 为完整发布产物列表（前端按平台渲染版本选择，不再默认下载第一个文件）
         - 失败保持现状（download_url 兜底为 html_url），不阻塞采集
         - track_progress=False：存量全库回填（backfill_all）复用本函数时不扰动本轮进度
+        - 非 GitHub 来源按 `source` 分派客户端，且用裸名调平台 API
         """
+        source = cand.get("source") or "github"
+        client = self._client_for(source) or self.client
+        bare = cand.get("bare_name") or split_qualified(cand["full_name"])[1]
         try:
-            release = self.client.get_latest_release(cand["full_name"])
+            if source == "github":
+                release = client.get_latest_release(cand["full_name"])
+            else:
+                release = client.get_latest_release(bare)
         except GitHubError as exc:
             log.warning("release 补全失败 %s: %s", cand["full_name"], exc)
             return  # 失败不落探测标记，下次启动/下一轮重试
+        except PlatformError as exc:
+            log.warning("release 补全失败 %s: %s", cand["full_name"], exc)
+            return
         if not release:
             # 项目确无 release（404）：落探测标记，避免每次启动全库重复探测
             self.db.mark_assets_probed(cand["full_name"])
@@ -785,6 +937,7 @@ class Collector:
             (a["url"] for a in asset_list if a["url"]), ""
         ) or cand.get("html_url", "")
         cand["major_version"] = major_version_of(release.get("tag_name", ""))
+        cand["source"] = source
         # 主分类保持入库时的值（跨界项目由 _store/add_category 管理分类，回填不改主分类）
         existing = self.db.project_exists(cand["full_name"])
         if existing is not None:
@@ -928,8 +1081,15 @@ class Collector:
             self._backfill_all_lock.release()
 
     def _backfill_variants_one(self, cand: dict) -> bool:
-        """重探单个项目的语言变体（含中/英之外的全部语言）；返回是否采到变体内容。"""
+        """重探单个项目的语言变体（含中/英之外的全部语言）；返回是否采到变体内容。
+
+        仅 GitHub 有语言变体探测：其它平台在 enrich 阶段已把 `readme_variants`
+        标记为 `'{}'`（采过、无变体），这里直接跳过，避免无谓请求。
+        """
         full_name = cand["full_name"]
+        source = cand.get("source") or split_qualified(full_name)[0]
+        if source != "github":
+            return False
         try:
             bundle = self.client.get_readme_bundle(
                 full_name, default_readme=cand.get("readme") or ""
@@ -997,14 +1157,25 @@ class Collector:
             self._backfill_all_lock.release()
 
     # ---------------- 筛选 ----------------
-    def _filter_stars(self, enriched: list[dict], min_stars: int) -> list[dict]:
-        """代码层热度兜底：用本轮生效的 min_stars（手动覆盖优先），0=不限。"""
+    def _filter_stars(self, enriched: list[dict], explicit_min_stars: int | None) -> list[dict]:
+        """代码层热度兜底：按项目来源各自的阈值过滤（0=不限）。
+
+        各平台星数不在同一量级，用同一个数字会把 Codeberg 全量误杀
+        （实测 Codeberg 全站最高约 7k 星，GitHub 头部 40 万）。
+        """
         out = []
+        thresholds: dict[str, int] = {}
         for c in enriched:
-            if c.get("stars", 0) >= min_stars:
+            src = c.get("source") or "github"
+            if src not in thresholds:
+                thresholds[src] = self._source_min_stars(src, explicit_min_stars)
+            if c.get("stars", 0) >= thresholds[src]:
                 out.append(c)
             else:
-                log.debug("候选 %s stars=%s 低于门槛，过滤", c.get("full_name"), c.get("stars"))
+                log.debug(
+                    "候选 %s（%s）stars=%s 低于门槛 %s，过滤",
+                    c.get("full_name"), src, c.get("stars"), thresholds[src],
+                )
         return out
 
     # ---------------- 入库（去重 + 重大更新再推荐） ----------------
@@ -1115,7 +1286,26 @@ class Collector:
             updated = nochange = failed = 0
             for idx, row in enumerate(rows, 1):
                 try:
-                    rel = self.client.get_latest_release(row["full_name"])
+                    # 按项目来源分派客户端，非 GitHub 用裸名（row 里存的是带前缀主键）
+                    row_source = (
+                        row["source"] if "source" in row.keys() and row["source"]
+                        else "github"
+                    )
+                    # 未启用的平台不参与更新检查（避免为已停用来源白白请求）
+                    if row_source not in self.clients:
+                        nochange += 1
+                        continue
+                    client = self._client_for(row_source) or self.client
+                    bare = (
+                        split_qualified(row["full_name"])[1]
+                        if row_source != "github" else row["full_name"]
+                    )
+                    try:
+                        rel = client.get_latest_release(bare)
+                    except PlatformError as exc:
+                        log.warning("release 检查失败 %s: %s", row["full_name"], exc)
+                        failed += 1
+                        continue
                     now2 = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
                     if rel is None:
                         # 无 release（未发版仓库）视为无变化：同样落 last_check_at，
@@ -1177,13 +1367,18 @@ class Collector:
 
 
 def _to_candidate(item: dict, category: str) -> dict:
+    # stars 键兼容两种来源：GitHub API 原生 `stargazers_count`，以及各平台客户端
+    # 已统一映射好的 `stars`（PlatformClient 契约）。漏掉后者会让非 GitHub 候选恒 0 星。
+    stars = item.get("stargazers_count")
+    if stars is None:
+        stars = item.get("stars")
     return {
         "full_name": item.get("full_name", ""),
         "name": item.get("name", ""),
         "owner": (item.get("full_name") or "/").split("/")[0],
         "description": item.get("description") or "",
         "homepage": item.get("homepage") or "",
-        "stars": int(item.get("stargazers_count") or 0),
+        "stars": int(stars or 0),
         "language": item.get("language") or "",
         "pushed_at": item.get("pushed_at") or "",
         "html_url": item.get("html_url") or "",

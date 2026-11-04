@@ -2064,6 +2064,24 @@ a:hover {
   vertical-align: middle;
 }
 
+/* 来源平台徽标：仅非 GitHub 项目显示（GitHub 占存量绝对多数，标了是噪音）。
+   与 NEW 角标区分——描边弱化风格，不与主色抢视线 */
+.source-badge {
+  display: inline-block;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent-weak);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  border-radius: var(--radius);
+  padding: 0 6px;
+  margin-left: 6px;
+  user-select: none;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 /* ===== 采集参数选择 ===== */
 .collect-params {
   display: flex;

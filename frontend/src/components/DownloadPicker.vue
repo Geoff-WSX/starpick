@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { openExternal, detectOS, formatSize, type Project } from '../api'
+import { openExternal, canMirror, detectOS, formatSize, type Project } from '../api'
 import { t } from '../composables/useI18n'
 
 const props = defineProps<{ project: Project }>()
@@ -34,10 +34,13 @@ const groups = computed(() => {
   return keys.map((k) => ({ platform: k, items: map.get(k)! }))
 })
 
-/** GitHub 直链 → 镜像加速链接（gh-proxy 系列：前缀 + 完整原始 URL 即转发） */
+/** 来源平台直链 → 镜像加速链接（gh-proxy 系列：前缀 + 完整原始 URL 即转发）
+ *
+ * 镜像只转发 GitHub 直链；Codeberg/Gitee 直链国内可直连，拼前缀只会 404。 */
 function mirrorUrl(url: string): string {
   const p = props.project.mirror_prefixes?.[0]
-  if (!p || !url.startsWith('https://github.com/')) return ''
+  if (!p || !canMirror(props.project)) return ''
+  if (!url.startsWith('https://github.com/')) return ''
   return `${p}${url}`
 }
 

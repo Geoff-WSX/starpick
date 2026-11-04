@@ -6,7 +6,10 @@ import { marked } from 'marked'
 import { t, mapReqLabel } from '../composables/useI18n'
 import {
   addFavorite,
+  bareFullName,
+  canMirror,
   detectOS,
+  displayFullName,
   fetchHealthSnapshots,
   fetchProjectDetail,
   fetchOwnerProjects,
@@ -16,7 +19,9 @@ import {
   formatSize,
   formatStars,
   openExternal,
+  projectSource,
   removeFavorite,
+  SOURCE_LABELS,
   type HealthSnapshot,
   type Project,
   type ProjectDetail,
@@ -31,17 +36,27 @@ const loading = ref(true)
 const error = ref('')
 const currentOS = detectOS()
 
-// 当前系统匹配的安装包（下载区默认项）
+/** 来源平台（GitHub 项目不显示徽标） */
+const source = computed(() => projectSource(detail.value ?? {}))
+const showSourceBadge = computed(() => source.value !== 'github')
+const sourceLabel = computed(() => SOURCE_LABELS[source.value] ?? source.value)
+
+/** 当前系统匹配的安装包（下载区默认项） */
 const matchedAssets = computed(() => {
   const d = detail.value
   if (!d || !currentOS) return []
   return d.assets.filter((a) => a.platform === currentOS)
 })
 
-/** GitHub 直链 → 镜像加速链接（gh-proxy 系列：前缀 + 完整原始 URL 即转发） */
+/** 来源平台的直链 → 镜像加速链接（gh-proxy 系列：前缀 + 完整原始 URL 即转发）
+ *
+ * 镜像只转发 GitHub 的 raw/release 直链；Codeberg、Gitee 直链国内可直连，
+ * 拼接前缀只会得到 404，必须按来源旁路。
+ */
 function mirrorUrl(url: string): string {
   const p = detail.value?.mirror_prefixes?.[0]
-  if (!p || !url.startsWith('https://github.com/')) return ''
+  if (!p || !canMirror(detail.value)) return ''
+  if (!url.startsWith('https://github.com/')) return ''
   return `${p}${url}`
 }
 
@@ -432,7 +447,8 @@ const readmeHtml = computed(() => {
       : d.readme
   }
   if (!md) return ''
-  const resolved = resolveReadme(md, d.full_name, d.html_url, mirrorPrefix.value, baseDir)
+  // full_name 传裸名：入库主键带 `codeberg:` 前缀，直接拼进 raw 链接会得到错误 URL
+  const resolved = resolveReadme(md, bareFullName(d), d.html_url, mirrorPrefix.value, baseDir)
   return DOMPurify.sanitize(marked.parse(resolved, { async: false }) as string, {
     ADD_ATTR: ['target', 'rel'],
   })
@@ -521,7 +537,7 @@ async function loadHealth() {
 const releaseNotesHtml = computed(() => {
   const notes = detail.value?.release_notes ?? ''
   if (!notes) return ''
-  const resolved = resolveReadme(notes, detail.value?.full_name ?? '', detail.value?.html_url ?? '', mirrorPrefix.value)
+  const resolved = resolveReadme(notes, detail.value ? bareFullName(detail.value) : '', detail.value?.html_url ?? '', mirrorPrefix.value)
   return DOMPurify.sanitize(marked.parse(resolved, { async: false }) as string, {
     ADD_ATTR: ['target', 'rel'],
   })
@@ -548,7 +564,13 @@ function back() {
           <path d="M7 31a17 17 0 0 0 34 0" fill="none" stroke="var(--text)" stroke-width="4.5" stroke-linecap="round" />
           <path d="M24 7l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7-5.4-4.7 7.1-.6z" fill="var(--accent)" />
         </svg>
-        <span class="detail-name">{{ detail?.name || detail?.full_name || t('detail_name_fallback') }}</span>
+        <span class="detail-name">{{ detail?.name || (detail ? bareFullName(detail) : '') || t('detail_name_fallback') }}</span>
+        <!-- 来源徽标：仅非 GitHub 显示（与卡片一致） -->
+        <span
+          v-if="showSourceBadge"
+          class="source-badge"
+          :title="t('card_source_tip').replace('{s}', sourceLabel)"
+        >{{ sourceLabel }}</span>
       </h1>
       <span v-if="detail" class="stars">★ {{ formatStars(detail.stars) }}</span>
     </header>
@@ -608,8 +630,14 @@ function back() {
           </template>
           <button v-else class="btn dl" @click="openInstallPrompt">{{ t('detail_copy_prompt') }}</button>
           <span class="actions-spacer"></span>
-          <button class="btn ghost" :title="t('detail_github_net_tip')" @click="external(detail.html_url)">
-            {{ detail.assets.length > 0 ? t('detail_github_release') : t('detail_github') }}
+          <button
+            class="btn ghost"
+            :title="detail.source === 'github'
+              ? t('detail_github_net_tip')
+              : displayFullName(detail)"
+            @click="external(detail.html_url)"
+          >
+            {{ sourceLabel }} {{ detail.assets.length > 0 ? t('detail_src_release') : '' }}↗
           </button>
         </div>
         <!-- 安装提示词的说明独占一行，不再插在按钮之间 -->

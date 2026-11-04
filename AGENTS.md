@@ -94,6 +94,20 @@ packaging/               # 桌面打包：spec/双平台构建脚本/Inno 配置
 - 后端 `search_projects(platform=...)` 用 **带引号 LIKE `%"Windows"%`** 精确匹配 platforms JSON 数组——裸 LIKE 会让 Web 命中 Windows，测试锁定了该行为。
 - 语言组「中文」是**中文友好口径**（`zh=1`，含简介英文但中文友好的项目，约 430 个），不是简介语言判定；「英文」才是 `lang=en`。组内严格单选（`isLangActive`）。
 
+## 多平台采集（2026-11 落地，Codeberg 已接入）
+
+- **架构**：`backend/app/platforms/` 是平台抽象层。`PlatformClient` 契约只有三方法——`search_repositories(keywords, min_stars, ...)` / `get_readme(bare_name)` / `get_latest_release(bare_name)`，返回**统一 GitHub 语义**字典（`stars`/`topics`/`assets`…），让 collector 下游（复检/打分/入库/回填）不感知平台差异。新增平台 = 加一个 `platforms/xxx.py` + 在 `config.KNOWN_SOURCES` 与 `build_platform_clients` 注册。
+- **`full_name` 的双形态（关键）**：平台内部调用用**裸名** `owner/repo`；入库主键用**限定名** `source:owner/repo`（GitHub 不加前缀，保持与存量 1945 条一致）。这正是为了绕开 `projects.full_name` 的 UNIQUE 约束——`forgejo/forgejo` 在 GitHub 与 Codeberg 同时存在，是两个独立项目。转换用 `platforms.qualify` / `split_qualified`；前端用 `api.ts` 的 `bareFullName()` **剥掉前缀再展示**（曾把 `codeberg:ziglang/zig` 直接印在卡片标题上，是 bug）。
+- **`source` 列**：`_SCHEMAS` 末尾追加，默认 `'github'`（存量免回填）。`_LIST_COLS`、`ProjectOut`、`FavoriteOut`、`list_projects_for_update` 都要带上它，否则前端/更新检查拿不到来源。
+- **Codeberg 必须按「全站高星榜」采，不能按分类关键词**：实测按分类关键词只能捞到 1~12 星的课程/练习仓库，而真正的高星项目（zig 6993★、forgejo 5768★、Gadgetbridge 2016★）与 12 个分类关键词几乎不重合。所以 `CodebergClient.search_repositories` **忽略 keywords**、按 star 倒序翻页拉榜单，交给 collector 的 `_match_categories` 本地归类，归不上的丢弃。collector 侧对非 GitHub 平台**一次拉取、分发到各分类**（`_search_category(preloaded=...)`），避免同一榜单被拉 12 次。
+- **榜单模式的两条坑**：① 空分类模式（某分类没有可编译关键词）若走「全部通过」，会让每个分类收下整份榜单 → `preloaded` 非空且无模式时直接返回空；② 同一项目可命中多个分类，**不要按 full_name 去重**——`_store` 靠重复候选把后续分类并入「附加分类」，去重会破坏跨界标注（有测试锁定）。
+- **星数阈值必须分平台**：`sources.min_stars`（github 200 / codeberg 20 / gitee 100）。Codeberg 全站最高约 7k 星，套用 GitHub 的 200 会全量误杀。`_source_min_stars()` 处理手动覆盖：`None`=用各平台默认，`0`=不限，`>0`=所有平台统一。
+- **镜像必须按来源旁路**：`canMirror()` → 只有 github 能拼 gh-proxy 前缀。涉及 4 处——`DownloadPicker.mirrorUrl`、`ProjectDetail.mirrorUrl`、`installPrompt.ts`（非 GitHub **整段跳过**「GitHub 访问加速」）、`resolveReadme` 的 raw 图片链接。给 Codeberg 链接拼镜像前缀只会得到 404。
+- **`_to_candidate` 的 stars 兼容**：GitHub API 字段是 `stargazers_count`，平台客户端统一映射成 `stars`。只读前者会让所有非 GitHub 候选恒 0 星（已修，勿再改回）。
+- **Codeberg API 实测约束**：搜索 `q` 是短语匹配（`video player` 返 0）、中文关键词无索引（`q=视频` 恒空）、`limit` 上限 50、限流 2000 次/10 分钟（比 GitHub 匿名宽松得多）；README 走 `/api/v1/repos/{owner}/{repo}/raw/README.md` 自动用默认分支且不占配额；无 `/releases/latest` 端点，要从 `/releases` 数组里挑非 draft/prerelease 的第一条。
+- **前端来源筛选组**：位置在「平台」之后，整组仅在库内存在非 GitHub 项目时渲染（`/api/categories` 附带 `sources` 计数决定）。GitHub 项目**不显示来源徽标**（1945 条存量标了只是噪音），只有非 GitHub 才出现 `.source-badge`。
+- **已知遗留（关键词表）**：Codeberg 高星项目命中率低（9 个测试项目仅 3 个能归类），且 `dnkl/foot`（Wayland 终端）因含 `emulator` 被误归「游戏」。这是既有中文关键词表的通用性缺陷（GitHub 侧同样存在），修它会影响 1952 个存量项目，需单独立项。
+
 ## 界面国际化（2026-10-29 落地，v1.3 起）
 
 - **中英切换**：顶栏语言按钮（日夜按钮旁，显示目标语言「EN/中」），localStorage `starpick-lang` 记忆，`<html lang>` 同步。

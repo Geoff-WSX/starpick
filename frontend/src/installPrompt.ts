@@ -16,6 +16,8 @@ export interface InstallPromptSource {
   mirror_prefixes?: string[]
   /** 发布页安装包：仅在提示词里取一个做真实的镜像示例链接 */
   assets?: { name: string; url: string; platform?: string }[]
+  /** 来源平台：非 github 时镜像段落整段跳过（镜像只服务 GitHub 直链） */
+  source?: string
 }
 
 /** 单行化 + 截断：简介可能是多行英文长文，整段塞进提示词会喧宾夺主 */
@@ -52,7 +54,11 @@ export function buildInstallPromptEn(p: InstallPromptSource, os: string): string
   const sys = ['Windows', 'macOS', 'Linux'].includes(os) ? os : ''
   lines.push(sys ? `My OS: ${sys} (if your judgment differs, confirm with me first)` : 'My OS: ask me to confirm before starting')
 
-  const prefixes = (p.mirror_prefixes || []).filter((x) => x.startsWith('https://')).slice(0, 3)
+  // 非 GitHub 来源（Codeberg/Gitee）国内可直连，镜像段落整段跳过——
+  // 给 AI 助手拼 gh-proxy 前缀只会得到 404，反而误导下载
+  const prefixes = (p.source ?? 'github') === 'github'
+    ? (p.mirror_prefixes || []).filter((x) => x.startsWith('https://')).slice(0, 3)
+    : []
   if (prefixes.length) {
     const ex = pickMirrorExample(p, sys)
     lines.push(
@@ -103,7 +109,11 @@ function buildInstallPromptZh(p: InstallPromptSource, os: string): string {
   const sys = ['Windows', 'macOS', 'Linux'].includes(os) ? os : ''
   lines.push(sys ? `我的系统：${sys}（如与你判断的不一致，请先和我确认）` : '我的系统：请先问我确认后再开始')
 
-  const prefixes = (p.mirror_prefixes || []).filter((x) => x.startsWith('https://')).slice(0, 3)
+  // 非 GitHub 来源（Codeberg/Gitee）国内可直连，镜像段落整段跳过——
+  // 给 AI 助手拼 gh-proxy 前缀只会得到 404，反而误导下载
+  const prefixes = (p.source ?? 'github') === 'github'
+    ? (p.mirror_prefixes || []).filter((x) => x.startsWith('https://')).slice(0, 3)
+    : []
   if (prefixes.length) {
     const ex = pickMirrorExample(p, sys)
     lines.push(

@@ -37,6 +37,18 @@ dedup:
   rounds_retention: 90                 # rounds 表保留最近 N 轮
   skip_existing_days: 7                # 已采集且 README 完整的项目，N 天内跳过详情抓取（每轮只拉新项目，显著提速；0=每次都全量刷新）
 
+sources:
+  # 参与采集的开源平台（github 恒在，其余按需开启）。
+  # 各平台星数量级差异极大，min_stars 必须分平台配置：Codeberg 全站最高约 7k 星，
+  # 套用 GitHub 的 200 会把几乎所有 Codeberg 项目过滤掉。
+  enabled:
+    - github
+    - codeberg
+  min_stars:
+    github: 200
+    codeberg: 20        # Codeberg 星数普遍很低，20 星已属于较受关注的项目
+    gitee: 100          # 预留：接入 Gitee 后生效
+
 categories:
   影视:
     - 追剧

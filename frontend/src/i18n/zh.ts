@@ -29,6 +29,7 @@ export default {
   filter_lang: '语言',
   filter_new: '新增',
   filter_platform: '平台',
+  filter_source: '来源',
   filter_search: '搜索',
   filter_all: '全部',
   filter_all_lang: '全部语言',
@@ -212,6 +213,7 @@ export default {
   readme_default_zh: '中文',
   readme_default_orig: '原文',
   card_new_tip: '最近一轮采集新增',
+  card_source_tip: '该项目来自 {s}（非 GitHub 来源不显示此标签）',
   notif_new_project: '新项目收录：{name}',
   notif_new_version: '有新版：{name} {tag}',
 
@@ -322,6 +324,8 @@ export default {
   detail_detecting_tip: '正在后台探测 GitHub release，完成后这里会出现下载按钮；无 Token 时限速约 60 个/小时',
   detail_github_net_tip: '需可访问 GitHub 的网络；打不开时可直接使用下方站内 README',
   detail_github_release: 'GitHub 发布页 ↗',
+  // 非 GitHub 来源的「在来源平台查看」按钮后缀（前面拼平台名，如「Codeberg 发布页 ↗」）
+  detail_src_release: '发布页',
   detail_github: 'GitHub ↗',
   detail_no_pkg_q: '没有现成安装包？',
   detail_detecting_q: '安装包还在检测中？',

@@ -26,6 +26,60 @@ export interface Asset {
   platform: string
 }
 
+// ---- 多平台来源（2026-11 起） ----
+
+/** 来源平台标识 → 名称（与后端 platforms.SOURCE_LABELS 对应；i18n 不覆盖品牌名） */
+export const SOURCE_LABELS: Record<string, string> = {
+  github: 'GitHub',
+  codeberg: 'Codeberg',
+  gitee: 'Gitee',
+  gitlab: 'GitLab',
+}
+
+/** 来源平台 → 展示域名（详情页/收藏弹窗显示 owner/repo 前缀） */
+const SOURCE_HOSTS: Record<string, string> = {
+  github: 'github.com',
+  codeberg: 'codeberg.org',
+  gitee: 'gitee.com',
+  gitlab: 'gitlab.com',
+}
+
+/** 项目所属来源平台（老数据缺字段时视为 GitHub） */
+export function projectSource(p: { source?: string }): string {
+  return p.source || 'github'
+}
+
+/**
+ * 裸仓库名 `owner/repo`（剥掉非 GitHub 的入库前缀 `codeberg:`）。
+ *
+ * `full_name` 是入库主键，非 GitHub 项目带 `source:` 前缀防跨平台重名撞唯一约束；
+ * 那个前缀只对数据库有意义，**绝不能直接展示给用户**。
+ */
+export function bareFullName(p: { full_name: string }): string {
+  const i = p.full_name.indexOf(':')
+  return i === -1 ? p.full_name : p.full_name.slice(i + 1)
+}
+
+/** 来源平台的仓库地址前缀，如 `codeberg.org` */
+export function sourceHost(p: { source?: string }): string {
+  return SOURCE_HOSTS[projectSource(p)] ?? 'github.com'
+}
+
+/** 项目在来源平台上的完整可读名（`codeberg:a/b` → `codeberg.org/a/b`） */
+export function displayFullName(p: { full_name: string; source?: string }): string {
+  return `${sourceHost(p)}/${bareFullName(p)}`
+}
+
+/**
+ * 该来源的 URL 能否走镜像加速。
+ *
+ * 镜像（gh-proxy / ghproxy.net）只转发 GitHub 的 raw 与 release 下载直链；
+ * Codeberg/Gitee 的直链国内可直连，拼接镜像前缀只会得到 404，必须旁路。
+ */
+export function canMirror(p: { source?: string } | null | undefined): boolean {
+  return projectSource(p ?? {}) === 'github'
+}
+
 export interface Project {
   id: number
   full_name: string
@@ -59,6 +113,11 @@ export interface Project {
   is_favorite: boolean
   /** 收藏所在分组 */
   favorite_group: string
+  /**
+   * 项目来源平台（github / codeberg / gitee）。
+   * 非 github 时：卡片显示来源徽标，下载/README 镜像加速需旁路（镜像只服务 GitHub）。
+   */
+  source: string
 }
 
 export interface ProjectDetail extends Project {
@@ -154,6 +213,8 @@ export async function fetchProjects(params: {
   zh?: string
   /** 按平台过滤（Windows/macOS/Linux/Android/iOS/Web/Docker） */
   platform?: string
+  /** 按来源平台过滤（github/codeberg/gitee）；空 = 全部来源 */
+  source?: string
   page: number
   page_size: number
   sort: string
@@ -165,6 +226,7 @@ export async function fetchProjects(params: {
   if (params.new) q.set('new', params.new)
   if (params.zh) q.set('zh', params.zh)
   if (params.platform) q.set('platform', params.platform)
+  if (params.source) q.set('source', params.source)
   q.set('page', String(params.page))
   q.set('page_size', String(params.page_size))
   q.set('sort', params.sort)
@@ -222,7 +284,7 @@ export function fetchCollectParams(): Promise<CollectParams> {
   return getJson('/api/collect/params')
 }
 
-export function fetchCategories(): Promise<{ categories: string[]; counts?: Record<string, number>; custom_en?: Record<string, string> }> {
+export function fetchCategories(): Promise<{ categories: string[]; counts?: Record<string, number>; custom_en?: Record<string, string>; sources?: Record<string, number> }> {
   return getJson('/api/categories')
 }
 
@@ -361,6 +423,8 @@ export interface FavoriteOut {
   has_update: boolean
   latest_tag: string
   last_check_at: string
+  /** 来源平台（决定显示 github.com 还是 codeberg.org 前缀） */
+  source?: string
 }
 
 export interface FavoriteGroups {

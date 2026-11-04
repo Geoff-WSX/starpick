@@ -7,6 +7,7 @@ import {
   fetchShufflePick,
   fetchCategories,
   fetchProjects,
+  SOURCE_LABELS,
   type DailyPick,
   type Project,
 } from '../api'
@@ -28,6 +29,7 @@ const lang = ref(typeof q.lang === 'string' ? q.lang : '')
 const onlyNew = ref(typeof q.new === 'string' ? q.new : '')
 const onlyZh = ref(typeof q.zh === 'string' ? q.zh : '')
 const platform = ref(typeof q.platform === 'string' ? q.platform : '')
+const source = ref(typeof q.source === 'string' ? q.source : '')
 const sort = ref(typeof q.sort === 'string' ? q.sort : 'stars')
 const page = ref(parseInt(typeof q.page === 'string' ? q.page : '1', 10) || 1)
 const loading = ref(false)
@@ -38,14 +40,22 @@ const error = ref('')
 // chip 上附带各分类项目数（'全部' 显示总数，加载后填充）
 const CATEGORIES = ref<string[]>(['', '影视', '视频工具', '游戏', '游戏开发', '开发', 'AI工具', '效率工具', '加速工具', '设计', '创作', '音乐', '阅读'])
 const categoryCounts = ref<Record<string, number>>({})
+// 来源平台计数：仅在库内存在非 GitHub 项目时用于渲染「来源」筛选组
+const sourceCounts = ref<Record<string, number>>({})
 fetchCategories()
   .then((r) => {
     const list = r.categories ?? []
     CATEGORIES.value = ['', ...list]
     categoryCounts.value = r.counts ?? {}
+    sourceCounts.value = r.sources ?? {}
     if (r.custom_en) registerCustomCategoryEn(r.custom_en)
   })
   .catch(() => { /* 后端暂不可用：保留内置兜底 */ })
+
+/** 来源筛选组：库里只有 GitHub 项目时整组不渲染（升级后不该多出恒为单选的筛选） */
+const showSourceFilter = computed(() =>
+  Object.keys(sourceCounts.value).some((s) => s !== 'github'),
+)
 const LANGS = [
   { value: '', label: () => t('filter_all_lang') },
   { value: 'zh', label: () => t('filter_zh') },
@@ -67,6 +77,7 @@ function applyQuery() {
   if (onlyNew.value) query.new = onlyNew.value
   if (onlyZh.value) query.zh = onlyZh.value
   if (platform.value) query.platform = platform.value
+  if (source.value) query.source = source.value
   if (sort.value !== 'stars') query.sort = sort.value
   if (page.value > 1) query.page = String(page.value)
   router.replace({ query })
@@ -74,7 +85,7 @@ function applyQuery() {
 
 /** 是否有任一筛选生效（空态文案与「清除筛选」按钮用） */
 function hasActiveFilters() {
-  return Boolean(category.value || keyword.value.trim() || lang.value || onlyNew.value || onlyZh.value || platform.value)
+  return Boolean(category.value || keyword.value.trim() || lang.value || onlyNew.value || onlyZh.value || platform.value || source.value)
 }
 
 /** 一键清除全部筛选回全部列表 */
@@ -95,6 +106,7 @@ async function loadProjects(append = false) {
       new: onlyNew.value || undefined,
       zh: onlyZh.value || undefined,
       platform: platform.value || undefined,
+      source: source.value || undefined,
       page: page.value,
       page_size: pageSize,
       sort: sort.value,
@@ -119,7 +131,7 @@ async function loadProjects(append = false) {
 function saveSnapshot(pageOverride?: number) {
   try {
     const snapshot: Record<string, string> = {}
-    for (const key of ['category', 'keyword', 'lang', 'new', 'zh', 'platform', 'sort']) {
+    for (const key of ['category', 'keyword', 'lang', 'new', 'zh', 'platform', 'source', 'sort']) {
       const v = route.query[key]
       if (typeof v === 'string' && v) snapshot[key] = v
     }
@@ -139,6 +151,7 @@ watch(
         onlyNew.value = typeof q2.new === 'string' ? q2.new : ''
         onlyZh.value = typeof q2.zh === 'string' ? q2.zh : ''
         platform.value = typeof q2.platform === 'string' ? q2.platform : ''
+        source.value = typeof q2.source === 'string' ? q2.source : ''
         sort.value = typeof q2.sort === 'string' ? q2.sort : 'stars'
     page.value = parseInt(typeof q2.page === 'string' ? q2.page : '1', 10) || 1
     // 同步会话记忆：任何 URL 变化都记录，详情页返回可恢复（含直接改地址/刷新场景）
@@ -171,12 +184,13 @@ function loadMore() {
 // 处于翻页深处/带筛选时不打扰（重拉会跳页、且筛选集合可能没命中新项目）。
 async function silentReload() {
   if (loading.value || loadingMore.value) return
-  if (page.value !== 1 || category.value || keyword.value.trim() || onlyNew.value || onlyZh.value || platform.value) return
+  if (page.value !== 1 || category.value || keyword.value.trim() || onlyNew.value || onlyZh.value || platform.value || source.value) return
   try {
     const data = await fetchProjects({
       lang: lang.value || undefined,
       zh: onlyZh.value || undefined,
       platform: platform.value || undefined,
+      source: source.value || undefined,
       page: 1,
       page_size: pageSize,
       sort: sort.value,
@@ -257,6 +271,25 @@ function selectPlatform(p: string) {
   page.value = 1
   applyQuery()
 }
+
+/** 来源平台筛选（同样支持点第二次取消）；'全部' 传空串 */
+function selectSource(s: string) {
+  source.value = source.value === s ? '' : s
+  page.value = 1
+  applyQuery()
+}
+
+// 来源 chip 只列库内实际存在的平台（GitHub 恒显示，其余有数据才出现）
+const SOURCE_CHIPS = computed(() =>
+  Object.keys(sourceCounts.value)
+    .filter((s) => (sourceCounts.value[s] ?? 0) > 0)
+    .sort((a, b) => {
+      // GitHub 固定排首位，其余按项目数降序
+      if (a === 'github') return -1
+      if (b === 'github') return 1
+      return (sourceCounts.value[b] ?? 0) - (sourceCounts.value[a] ?? 0)
+    }),
+)
 
 // ---- 排序下拉：自绘组件（原生 select 弹出 UI 不可控） ----
 const SORT_OPTIONS = [
@@ -433,6 +466,26 @@ onUnmounted(() => {
           @click="selectPlatform(p)"
         >
           {{ p }}
+        </button>
+      </div>
+      <!-- 来源平台组：库里只有 GitHub 项目时整组不渲染（存量用户不该多出单选筛选） -->
+      <div v-if="showSourceFilter" class="filter-group">
+        <span class="filter-label">{{ t('filter_source') }}</span>
+        <button
+          class="chip source-chip"
+          :class="{ active: source === '' }"
+          @click="selectSource('')"
+        >
+          {{ t('filter_all') }}<span class="chip-count">{{ total }}</span>
+        </button>
+        <button
+          v-for="s in SOURCE_CHIPS"
+          :key="s"
+          class="chip source-chip"
+          :class="{ active: source === s }"
+          @click="selectSource(s)"
+        >
+          {{ SOURCE_LABELS[s] ?? s }}<span class="chip-count">{{ sourceCounts[s] ?? '' }}</span>
         </button>
       </div>
     </div>

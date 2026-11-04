@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { Project } from '../api'
-import { addFavorite, removeFavorite, formatDate, formatStars } from '../api'
+import { addFavorite, bareFullName, removeFavorite, formatDate, formatStars, projectSource, SOURCE_LABELS } from '../api'
 import { t, mapReqLabel } from '../composables/useI18n'
 import DownloadPicker from './DownloadPicker.vue'
 import InstallPromptModal from './InstallPromptModal.vue'
@@ -11,6 +11,11 @@ const props = defineProps<{ project: Project }>()
 const router = useRouter()
 const showPicker = ref(false)
 const showPrompt = ref(false)
+
+/** 来源平台：GitHub 项目不显示徽标（存量 1900+ 项目全是 GitHub，标了是噪音） */
+const source = computed(() => projectSource(props.project))
+const showSourceBadge = computed(() => source.value !== 'github')
+const sourceLabel = computed(() => SOURCE_LABELS[source.value] ?? source.value)
 
 // 卡片快速收藏：初始状态取项目 is_favorite，默认进「默认分组」
 const fav = ref(props.project.is_favorite)
@@ -87,7 +92,13 @@ function openInstallPrompt() {
     <div class="card-head">
       <div>
         <div class="card-title">
-          <span class="title-link">{{ project.full_name }}</span>
+          <span class="title-link">{{ bareFullName(project) }}</span>
+          <!-- 来源徽标：仅非 GitHub 显示（存量项目全是 GitHub，标了只是噪音） -->
+          <span
+            v-if="showSourceBadge"
+            class="source-badge"
+            :title="t('card_source_tip').replace('{s}', sourceLabel)"
+          >{{ sourceLabel }}</span>
           <span v-if="project.is_new" class="new-badge" :title="t('card_new_tip')">NEW</span>
         </div>
         <div class="card-owner">@{{ project.owner }}</div>

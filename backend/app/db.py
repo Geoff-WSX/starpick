@@ -191,6 +191,16 @@ _SCHEMAS: list[str] = [
     CREATE INDEX IF NOT EXISTS idx_projects_last_check ON projects(last_check_at, id);
     CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read_at);
     """,
+    # v20：项目来源平台（github / codeberg / gitee …）。
+    # 多平台接入后 full_name 可能跨平台重名（如 forgejo/forgejo 两个平台都有），
+    # 非 GitHub 项目的 full_name 存为「平台:owner/repo」前缀式，保留原有 UNIQUE 约束；
+    # 存量项目全部默认 github，无需回填。
+    """
+    ALTER TABLE projects ADD COLUMN source TEXT NOT NULL DEFAULT 'github';
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_projects_source ON projects(source);
+    """,
 ]
 
 # 列表查询只取展示所需列，避免拖读 readme/readme_zh/readme_en 等大字段
@@ -199,7 +209,7 @@ _LIST_COLS = (
     "id, full_name, name, owner, description, homepage, stars, language, pushed_at, "
     "html_url, topics, platforms, system_requirements, download_url, zh_friendly, "
     "category, major_version, lang, assets, assets_probed, "
-    "first_seen_at, last_recommended_at, categories"
+    "first_seen_at, last_recommended_at, categories, source"
 )
 
 
@@ -378,9 +388,10 @@ class Database:
         categories 非空时只取这些分类（命中主分类 category 或附加分类 categories 数组任一）。
         """
         # readme：资产名未命中平台规则时兜底推断平台标签（缺它会让该兜底恒为空）
+        # source：更新检查按项目来源分派客户端（非 GitHub 要用裸名调对应平台 API）
         sql = (
-            "SELECT id, full_name, stars, latest_tag, has_update, last_check_at, readme "
-            "FROM projects"
+            "SELECT id, full_name, stars, latest_tag, has_update, last_check_at, readme, "
+            "source FROM projects"
         )
         where = ""
         params: list = []
@@ -752,8 +763,8 @@ class Database:
                         download_url, zh_friendly, category, major_version,
                         first_seen_at, last_recommended_at, last_round_id,
                         readme, assets, lang, readme_zh, readme_en, ml_probed, categories,
-                        ml_variants_at, readme_variants)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        ml_variants_at, readme_variants, source)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         p["full_name"], p["name"], p["owner"], p.get("description", ""),
                         p.get("homepage", ""), p["stars"], p.get("language", ""),
@@ -777,6 +788,7 @@ class Database:
                         ),
                         p.get("ml_variants_at", ""),
                         p.get("readme_variants", ""),
+                        p.get("source") or "github",
                     ),
                 )
                 self._conn.commit()
@@ -908,22 +920,36 @@ class Database:
             ).fetchone()[0]
 
     def count_projects_pending_probe(self) -> int:
-        """尚未探测过 release 的项目数（顶栏「安装包检测 N/M」进度分母分子用）。"""
+        """尚未探测过 release 的项目数（顶栏「安装包检测 N/M」进度分子分母用）。"""
         with self._lock:
             return self._conn.execute(
                 "SELECT COUNT(*) FROM projects WHERE COALESCE(assets_probed, 0)=0"
             ).fetchone()[0]
 
+    def source_counts(self) -> dict[str, int]:
+        """各来源平台的项目数（首页「来源」筛选组的 chip 计数）。
+
+        只返回库内实际存在的来源；前端据此决定是否渲染整个筛选组
+        （全是 github 时不显示，避免给存量用户加一个无用的空筛选）。
+        """
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT source, COUNT(*) AS cnt FROM projects GROUP BY source"
+            ).fetchall()
+        return {(r["source"] or "github"): r["cnt"] for r in rows}
+
+
     def search_projects(self, category: str | None = None, keyword: str = "",
                         lang: str = "", page: int = 1, page_size: int = 20,
                         sort: str = "stars", new_since: str = "",
                         zh_friendly_only: bool = False,
-                        platform: str = "") -> tuple[list[sqlite3.Row], int]:
+                        platform: str = "", source: str = "") -> tuple[list[sqlite3.Row], int]:
         """按分类/语言/关键词查询，返回 (行列表, 总数)。keyword 对 name/description 做 LIKE 匹配。
 
         new_since 非空时仅返回该时间之后首次入库的项目（新增高亮筛选）。
         zh_friendly_only 只保留「中文友好」标记的项目（首页筛选用）。
         platform 非空时按平台过滤（platforms JSON 数组包含该平台，如 Windows/macOS/Android）。
+        source 非空时按来源平台过滤（github / codeberg / gitee）。
         sort：stars=Star 数 / recent=最近活跃（pushed_at）/ new=最近入库（first_seen_at）。
         """
         clauses, params = [], []
@@ -940,6 +966,9 @@ class Database:
             # platforms 是 JSON 数组字符串，带引号精确匹配平台名（Web 是 Windows 的子串，不能裸 LIKE）
             clauses.append("platforms LIKE ? ESCAPE '\\'")
             params.append(f'%"{self._escape_like(platform)}"%')
+        if source:
+            clauses.append("source=?")
+            params.append(source)
         if keyword:
             like = f"%{self._escape_like(keyword)}%"
             clauses.append(
@@ -1120,7 +1149,7 @@ class Database:
         sql = (
             "SELECT f.project_id, f.group_name, f.created_at, "
             "p.full_name, p.name, p.owner, p.description, p.stars, p.language, "
-            "p.category, p.has_update, p.latest_tag, p.last_check_at "
+            "p.category, p.has_update, p.latest_tag, p.last_check_at, p.source "
             "FROM favorites f JOIN projects p ON p.id = f.project_id"
         )
         params: list = []

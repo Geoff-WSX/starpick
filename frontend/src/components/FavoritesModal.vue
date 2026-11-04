@@ -6,6 +6,7 @@ import {
   fetchFavorites,
   removeFavorite,
   formatStars,
+  displayFullName,
   type FavoriteGroups,
   type FavoriteOut,
 } from '../api'
@@ -143,7 +144,7 @@ function close() {
           <div class="fav-main" @click="openDetail(item.project_id)">
             <div class="fav-title">
               <span class="fav-name">{{ item.name }}</span>
-              <span class="fav-full">github.com/{{ item.full_name }}</span>
+              <span class="fav-full">{{ displayFullName(item) }}</span>
             </div>
             <div class="fav-desc">{{ item.description || t('fav_no_desc') }}</div>
             <div class="fav-meta">

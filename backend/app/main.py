@@ -411,6 +411,8 @@ class ProjectOut(BaseModel):
     last_recommended_at: str
     categories: list[str] = []
     mirror_prefixes: list[str] = []
+    # 项目来源平台（github / codeberg / gitee）：前端据此显示来源徽标并旁路镜像加速
+    source: str = "github"
     is_new: bool = False
     is_favorite: bool = False
     favorite_group: str = ""
@@ -516,6 +518,8 @@ def list_projects(
     new: str = Query(default="", pattern="^(|new)$"),
     zh: str = Query(default="", pattern="^(|1)$"),
     platform: str = Query(default="", max_length=20),
+    # 来源平台筛选（github / codeberg / gitee）；空 = 全部来源
+    source: str = Query(default="", pattern="^(|github|codeberg|gitee|gitlab)$"),
 ) -> dict[str, Any]:
     # 新增角标/筛选共用口径：最近 NEW_WINDOW_HOURS 小时内首次入库的项目（不随空轮重置）。
     # 角标必须在普通列表也生效（new_since 非空即标记 is_new），否则 NEW 只在筛选后才可见；
@@ -526,7 +530,7 @@ def list_projects(
     filter_since = badge_since if new == "new" else ""
     rows, total = state.db.search_projects(
         category, keyword.strip(), lang, page, page_size, sort, filter_since,
-        zh_friendly_only=(zh == "1"), platform=platform,
+        zh_friendly_only=(zh == "1"), platform=platform, source=source,
     )
     items = [_project_out(r, new_since=badge_since) for r in rows]
     return {
@@ -815,7 +819,21 @@ def categories() -> dict[str, Any]:
                 if kw and kw.isascii():
                     custom_en[row["name"]] = kw
                     break
-    return {"categories": names, "counts": counts, "custom_en": custom_en}
+    return {"categories": names, "counts": counts, "custom_en": custom_en,
+            "sources": _source_counts()}
+
+
+def _source_counts() -> dict[str, int]:
+    """各来源平台项目数；前端据此决定是否渲染「来源」筛选组。
+
+    全是 github 时前端不显示该组（存量用户升级后不该多出一个恒为单选的筛选）。
+    """
+    if state.db is None:
+        return {"github": 0}
+    try:
+        return state.db.source_counts()
+    except Exception:  # 老库没跑完迁移时不让整个分类接口挂掉
+        return {"github": 0}
 
 
 def _all_categories() -> list[str]:
@@ -935,6 +953,8 @@ def _project_out(row, new_since: str = "") -> ProjectOut:
         categories=cats,
         mirror_prefixes=list(state.cfg.mirror_prefixes)
         if state.cfg and state.cfg.mirror_enabled else [],
+        # 存量核始终有值（迁移默认 github）；老快照行缺列时兜底 github
+        source=(row["source"] if "source" in row.keys() and row["source"] else "github"),
         is_new=bool(new_since and (row["first_seen_at"] or "") >= new_since),
         is_favorite=fav is not None,
         favorite_group=fav["group_name"] if fav is not None else "",
@@ -1056,6 +1076,8 @@ class FavoriteOut(BaseModel):
     has_update: bool = False
     latest_tag: str = ""
     last_check_at: str = ""
+    # 来源平台：收藏列表显示 `codeberg.org/owner/repo` 而非固定 github.com
+    source: str = "github"
 
 
 @app.post("/api/favorites/{project_id}", response_model=dict[str, Any])
@@ -1104,6 +1126,7 @@ def list_favorites(group: str = "") -> dict[str, Any]:
             language=r["language"] or "", category=r["category"],
             has_update=bool(r["has_update"]), latest_tag=r["latest_tag"] or "",
             last_check_at=_iso_utc(r["last_check_at"] or "") or "",
+            source=(r["source"] if "source" in r.keys() and r["source"] else "github"),
         ).model_dump()
         for r in rows
     ]
