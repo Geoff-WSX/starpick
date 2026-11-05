@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 采集中心弹窗：集中管理采集与更新检查（独立页面内容单薄，改为全局弹窗）
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, type Ref } from 'vue'
 import {
   fetchCollectStatus,
   triggerRun,
@@ -9,6 +9,7 @@ import {
   fetchUpdateStatus,
   triggerUpdates,
   fetchHealth,
+  SOURCE_LABELS,
   type CollectParams,
   type CollectStatus,
   type UpdateStatus,
@@ -58,6 +59,26 @@ const customMode = ref(false)
 const customCatName = ref('')
 const customCatKeywords = ref('')
 const updateCats = ref<string[]>([])
+
+// 来源平台选择：采集与更新各自独立的多选（空数组=全部启用平台）。
+// 可选平台取自 /api/categories 的 sources（库内实际存在的来源）而非硬编码，
+// 避免给用户一个勾了也没数据的平台。
+const allSources = ref<string[]>([])
+const collectSources = ref<string[]>([])
+const updateSources = ref<string[]>([])
+
+/** 多选切换（来源 chips 与分类 chips 共用同一套语义：空=全部） */
+function toggleIn(list: Ref<string[]>, v: string) {
+  const i = list.value.indexOf(v)
+  if (i >= 0) list.value.splice(i, 1)
+  else list.value.push(v)
+}
+function toggleCollectSource(s: string) {
+  toggleIn(collectSources, s)
+}
+function toggleUpdateSource(s: string) {
+  toggleIn(updateSources, s)
+}
 
 function toggleCat(c: string) {
   const i = collectCats.value.indexOf(c)
@@ -166,6 +187,7 @@ async function runNow() {
       categories?: string[]
       custom_name?: string
       custom_keywords?: string
+      sources?: string[]
     } = {
       min_stars: minStars.value,
       max_inactive_days: maxInactiveDays.value,
@@ -175,6 +197,10 @@ async function runNow() {
     }
     if (collectCats.value.length) {
       payload.categories = [...collectCats.value]
+    }
+    // 来源子集：空数组表示「全部启用平台」，此时不传（后端用配置默认）
+    if (collectSources.value.length) {
+      payload.sources = [...collectSources.value]
     }
     if (
       customMode.value &&
@@ -239,7 +265,8 @@ async function runUpdates() {
   updateRunning.value = true
   try {
     const cats = updateCats.value.length ? [...updateCats.value] : undefined
-    const res = await triggerUpdates(cats)
+    const srcs = updateSources.value.length ? [...updateSources.value] : undefined
+    const res = await triggerUpdates(cats, srcs)
     toast.value = res.reason || t('collect_update_triggered')
     setTimeout(() => (toast.value = ''), 5000)
     if (res.status === 'started') {
@@ -260,6 +287,15 @@ watch(
     if (open) {
       fetchCategories().then((r) => {
         allCategories.value = r.categories ?? []
+        // 来源 chips 只列库内实际有数据的平台（GitHub 恒在），按项目数降序
+        const counts = r.sources ?? {}
+        allSources.value = Object.keys(counts)
+          .filter((s) => (counts[s] ?? 0) > 0)
+          .sort((a, b) => {
+            if (a === 'github') return -1
+            if (b === 'github') return 1
+            return (counts[b] ?? 0) - (counts[a] ?? 0)
+          })
       }).catch(() => { /* 后端暂不可用时保持空列表 */ })
       fetchCollectParams().then((p) => {
         collectParams.value = p
@@ -371,6 +407,24 @@ function fmtTimeShort(iso: string): string {
           </label>
           <span class="param-hint">{{ t('collect_custom_hint') }}</span>
         </div>
+        <!-- 来源平台：只列库内实际有数据的平台；不选=全部启用平台 -->
+        <div v-if="allSources.length > 1" class="param-item cat-multi">
+          <span class="param-label">{{ t('collect_sources') }}</span>
+          <div class="cat-chips">
+            <button
+              class="chip"
+              :class="{ active: collectSources.length === 0 }"
+              @click="collectSources = []"
+            >{{ t('collect_all_sources') }}</button>
+            <button
+              v-for="s in allSources"
+              :key="s"
+              class="chip"
+              :class="{ active: collectSources.includes(s) }"
+              @click="toggleCollectSource(s)"
+            >{{ SOURCE_LABELS[s] ?? s }}</button>
+          </div>
+        </div>
         <span class="param-hint">{{ t('collect_cats_hint').replace('{n}', String(collectParams?.per_category_max ?? '—')) }}</span>
       </div>
 
@@ -418,6 +472,24 @@ function fmtTimeShort(iso: string): string {
               :class="{ active: updateCats.includes(c) }"
               @click="toggleUpdateCat(c)"
             >{{ t('cat_' + c) }}</button>
+          </div>
+        </div>
+        <!-- 来源平台：与采集区独立选择；不选=全部来源 -->
+        <div v-if="allSources.length > 1" class="param-item cat-multi">
+          <span class="param-label">{{ t('collect_sources') }}</span>
+          <div class="cat-chips">
+            <button
+              class="chip"
+              :class="{ active: updateSources.length === 0 }"
+              @click="updateSources = []"
+            >{{ t('collect_all_sources') }}</button>
+            <button
+              v-for="s in allSources"
+              :key="s"
+              class="chip"
+              :class="{ active: updateSources.includes(s) }"
+              @click="toggleUpdateSource(s)"
+            >{{ SOURCE_LABELS[s] ?? s }}</button>
           </div>
         </div>
         <span class="collect-hint">{{ t('collect_update_hint') }}</span>

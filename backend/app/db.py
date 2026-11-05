@@ -381,11 +381,13 @@ class Database:
 
     # ---------------- 更新检查（update_rounds 与采集轮次分开保存） ----------------
     def list_projects_for_update(self, limit: int | None = None,
-                                 categories: list[str] | None = None) -> list[dict]:
+                                 categories: list[str] | None = None,
+                                 sources: list[str] | None = None) -> list[dict]:
         """项目列表（更新检查用）：按 last_check_at 升序（最久未检查优先）。
 
         limit=None 全库（手动）；limit=N 增量检查前 N 条（定时滚动）。
         categories 非空时只取这些分类（命中主分类 category 或附加分类 categories 数组任一）。
+        sources 非空时只取这些来源平台（github/codeberg/…），与分类条件取交集。
         """
         # readme：资产名未命中平台规则时兜底推断平台标签（缺它会让该兜底恒为空）
         # source：更新检查按项目来源分派客户端（非 GitHub 要用裸名调对应平台 API）
@@ -393,7 +395,7 @@ class Database:
             "SELECT id, full_name, stars, latest_tag, has_update, last_check_at, readme, "
             "source FROM projects"
         )
-        where = ""
+        clauses: list[str] = []
         params: list = []
         if categories:
             conds: list[str] = []
@@ -406,7 +408,12 @@ class Database:
                 conds.append("categories LIKE ? ESCAPE '\\'")
                 params.append(f'%"{self._escape_like(cat)}"%')
             if conds:
-                where = " WHERE (" + " OR ".join(conds) + ")"
+                clauses.append("(" + " OR ".join(conds) + ")")
+        srcs = [s for s in (sources or []) if s]
+        if srcs:
+            clauses.append("source IN (" + ",".join("?" * len(srcs)) + ")")
+            params.extend(srcs)
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
         sql += where
         sql += " ORDER BY last_check_at ASC, id ASC"
         if limit is not None and int(limit) > 0:

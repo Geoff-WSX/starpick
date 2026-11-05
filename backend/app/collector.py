@@ -404,7 +404,14 @@ class Collector:
         custom_category: dict | None = None,
         source: str = "manual",
         discovery_only: bool = False,
+        sources: list[str] | None = None,
     ) -> dict[str, Any]:
+        """跑一轮采集。
+
+        `source` 是**轮次来源**（manual/scheduled/…，写进 rounds 表）；
+        `sources` 是**采集平台子集**（github/codeberg/…）；两者语义不同勿混用。
+        `sources` 为空时用配置里的 `enabled_sources`。
+        """
         round_id = self._acquire_run(source)
         if round_id is None:
             return {"status": "skipped", "reason": "已有采集任务运行中"}
@@ -419,7 +426,8 @@ class Collector:
                 summary = self._run_discovery(round_id, min_stars)
             else:
                 summary = self._run(round_id, min_stars, max_inactive_days,
-                                    per_category_top, categories, custom_category)
+                                    per_category_top, categories, custom_category,
+                                    sources=sources)
             stats = summary.get("stats", {})
             # 每日精选：全量轮必刷；发现轮仅在真的有新入库时刷（避免一天内反复换榜）
             if stats.get("mode") != "discovery" or stats.get("inserted", 0) > 0:
@@ -459,6 +467,7 @@ class Collector:
         per_category_top: int | None = None,
         categories: list[str] | None = None,
         custom_category: dict | None = None,
+        sources: list[str] | None = None,
     ) -> dict[str, Any]:
         candidates: list[dict] = []
         categories_summary: dict[str, int] = {}
@@ -496,15 +505,22 @@ class Collector:
         # "streamed from disk" 的 MoE 引擎当流媒体收进影视——搜索结果必须本地过关键词
         all_patterns = self._category_patterns()
         total_dropped = 0
-        # 本轮参与采集的平台（github 恒在，其余按 cfg.enabled_sources）
-        sources = [s for s in self.cfg.enabled_sources if self._client_for(s)]
+        # 本轮参与采集的平台：用户显式选中的子集优先，否则用配置里启用的全部。
+        # 收敛到已实例化的客户端（未启用的平台即使被选中也不会出现在 self.clients）。
+        wanted = sources if sources else self.cfg.enabled_sources
+        active_sources = [s for s in wanted if self._client_for(s)]
+        if not active_sources:
+            # 选中的平台一个都不可用（拼错/未启用）时回落到配置默认，避免静默零采集
+            log.warning("选中的来源 %s 均不可用，回落为配置默认 %s",
+                        sources, self.cfg.enabled_sources)
+            active_sources = [s for s in self.cfg.enabled_sources if self._client_for(s)]
         # 进度分母 = 分类数 × 平台数（多平台时进度条按「分类×平台」推进）
-        categories_total *= len(sources)
+        categories_total *= len(active_sources)
         self.progress.set(categories_total=categories_total)
-        for src in sources:
+        for src in active_sources:
             client = self._client_for(src)
             src_min_stars = self._source_min_stars(src, explicit_min_stars)
-            label = f"（{SOURCE_LABELS.get(src, src)}）" if len(sources) > 1 else ""
+            label = f"（{SOURCE_LABELS.get(src, src)}）" if len(active_sources) > 1 else ""
             if src == "github":
                 # GitHub 按分类逐个搜索（每分类一条查询构造，召回率最高）
                 per_category_items = None
@@ -599,7 +615,8 @@ class Collector:
                         else self.cfg.source_min_stars.get("github", self.cfg.min_stars)
                     ),
                     "source_min_stars": {
-                        s: self._source_min_stars(s, explicit_min_stars) for s in sources
+                        s: self._source_min_stars(s, explicit_min_stars)
+                        for s in active_sources
                     },
                     "max_inactive_days": max_days,
                     "per_category_max": per_cat,
@@ -1265,11 +1282,13 @@ class Collector:
             return self.db.has_running_update_round()
 
     def check_updates(self, limit: int | None = None,
-                     categories: list[str] | None = None) -> dict[str, Any]:
+                     categories: list[str] | None = None,
+                     sources: list[str] | None = None) -> dict[str, Any]:
         """检查已采集项目是否有新 release，结果写 update_rounds 历史。
 
         limit=None → 手动全库（scope=full）；limit=N → 定时增量检查最久未检查的 N 条（scope=incremental）。
         categories 非空时只检查这些分类的项目（可多选）。
+        sources 非空时只检查这些来源平台的项目（可多选，如 ['codeberg']）。
         单仓失败不中断整轮；整轮异常兜底落库，保证下一轮可跑。
         """
         scope = "full" if limit is None else "incremental"
@@ -1280,7 +1299,7 @@ class Collector:
         started_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         self.update_progress.start(started_at)
         try:
-            rows = self.db.list_projects_for_update(limit, categories)
+            rows = self.db.list_projects_for_update(limit, categories, sources)
             total = len(rows)
             self.update_progress.set(total=total, message=f"正在检查 {total} 个项目的 release 更新")
             updated = nochange = failed = 0

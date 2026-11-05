@@ -267,6 +267,8 @@ export async function triggerRun(payload?: {
   categories?: string[]
   custom_name?: string
   custom_keywords?: string
+  /** 只采集这些来源平台（github/codeberg/…）；空 = 配置内全部启用平台 */
+  sources?: string[]
 }): Promise<{ status: string; reason: string }> {
   const resp = await fetch('/api/run', {
     method: 'POST',
@@ -395,10 +397,18 @@ export function fetchUpdateSummary(): Promise<UpdateSummary> {
   return getJson('/api/updates/summary')
 }
 
-export async function triggerUpdates(categories?: string[]): Promise<{ status: string; mode?: string; reason?: string }> {
-  const qs = categories && categories.length
-    ? '?' + categories.map((c) => `category=${encodeURIComponent(c)}`).join('&')
-    : ''
+export async function triggerUpdates(
+  categories?: string[],
+  sources?: string[],
+): Promise<{ status: string; mode?: string; reason?: string }> {
+  const params: string[] = []
+  for (const c of categories ?? []) {
+    if (c) params.push(`category=${encodeURIComponent(c)}`)
+  }
+  for (const s of sources ?? []) {
+    if (s) params.push(`source=${encodeURIComponent(s)}`)
+  }
+  const qs = params.length ? '?' + params.join('&') : ''
   const resp = await fetch(`/api/updates/run${qs}`, { method: 'POST' })
   if (!resp.ok) {
     const body = await resp.json().catch(() => null)

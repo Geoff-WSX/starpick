@@ -218,6 +218,7 @@ def _collect_job(payload: RunRequest | None = None, source: str = "scheduled",
             payload.min_stars, payload.max_inactive_days,
             payload.per_category_top, payload.categories, custom_category,
             source=source, discovery_only=discovery_only,
+            sources=payload.sources,
         )
     log.info("采集任务结束: %s", summary.get("status"))
 
@@ -439,7 +440,8 @@ class RunRequest(BaseModel):
     """手动触发采集的过滤覆盖参数（可选；不传则用配置默认值，0=不限）。
 
     categories：只采集选中的分类子集（空/None=全部）；
-    custom_name/custom_keywords：自定义分类采集（自动持久化到首页分类）。
+    custom_name/custom_keywords：自定义分类采集（自动持久化到首页分类）；
+    sources：只采集选中的来源平台子集（空/None=配置里的 enabled_sources 全部）。
     """
 
     min_stars: int | None = Field(default=None, ge=0, le=1_000_000)
@@ -449,6 +451,8 @@ class RunRequest(BaseModel):
     categories: list[str] | None = Field(default=None, max_length=50)
     custom_name: str | None = Field(default=None, max_length=30)
     custom_keywords: str | None = Field(default=None, max_length=1000)
+    # 来源平台子集（github/codeberg/gitee）；空 = 配置内全部启用平台
+    sources: list[str] | None = Field(default=None, max_length=10)
 
 
 class RunOut(BaseModel):
@@ -1000,26 +1004,34 @@ class UpdateStatusOut(BaseModel):
 
 
 @app.post("/api/updates/run", response_model=dict[str, Any])
-def run_updates(category: list[str] | None = Query(default=None, description="只检查这些分类（可多选）")) -> dict[str, Any]:
+def run_updates(
+    category: list[str] | None = Query(default=None, description="只检查这些分类（可多选）"),
+    source: list[str] | None = Query(default=None, description="只检查这些来源平台（可多选）"),
+) -> dict[str, Any]:
     """手动触发更新检查（后台异步；防重入：已有运行中则跳过）。
 
     category 为空 → 全库；指定一个或多个分类 → 只检查这些分类下的项目。
+    source 为空 → 全部来源；指定则只检查这些来源平台（github/codeberg/…）。
     """
     if state.collector is None:
         raise HTTPException(status_code=503, detail="服务未就绪")
     if state.collector.is_update_running():
         return {"status": "skipped", "reason": "已有更新检查运行中"}
     cats = [c for c in (category or []) if c]
+    srcs = [s for s in (source or []) if s]
     # 预热进度快照（同 trigger_run）：线程内 check_updates 的 start 稍后才执行，
     # 前端首轮 /api/updates/status 若读到 running=false 会停轮询（进度面板不出现）
     state.collector.update_progress.start(
         datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     )
     threading.Thread(
-        target=lambda: state.collector.check_updates(limit=None, categories=cats or None), daemon=True,
+        target=lambda: state.collector.check_updates(
+            limit=None, categories=cats or None, sources=srcs or None,
+        ), daemon=True,
         name="updates-full",
     ).start()
-    return {"status": "started", "mode": "category" if cats else "full"}
+    mode = "category" if cats else ("source" if srcs else "full")
+    return {"status": "started", "mode": mode}
 
 
 @app.get("/api/updates/status", response_model=UpdateStatusOut)
