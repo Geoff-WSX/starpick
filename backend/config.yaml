@@ -94,6 +94,54 @@ categories:
     - retro
     - 掌机
     - 游戏存档
+    # 2026-11 补：裸词 `game` 不能用——它会把「游戏开发」分类的引擎/服务器框架
+    # （MonoGame/ebiten/OpenRA/skynet 等 147 个）全抢过来（游戏排在游戏开发之前）。
+    # 只用「明确在描述一个可玩作品」的短语。
+    - "playable game"
+    - "open source game"
+    - "video game"
+    - "arcade game"
+    - "gaming platform"
+    - "game launcher"
+    - "libretro"
+    # 2026-11 补（存量复核驱动）：覆盖描述里明确自称游戏、但没命中上面任何词的
+    # 项目——Cataclysm-DDA（survival game）、wesnoth（strategy game）、
+    # codecombat（game for learning）、baritone（block game）、
+    # Game-Cheats-Manager（game cheats）。
+    # ⚠ 不要加裸词 `gaming`：会抢走 70 个「游戏开发」项目（godot/bevy/phaser…），
+    #   它们的主分类必须留在游戏开发。只用不与之共现的精确短语。
+    - "survival game"
+    - "strategy game"
+    - "game cheats"
+    - "block game"
+    - "game for"
+    - "gaming platform"
+    # ---- 负关键词（`!` 前缀，命中即排除该分类）----
+    # 裸词 emulator 歧义严重：terminal emulator（alacritty/ghostty/wezterm 各 6 万星）、
+    # AWS/x86 主机模拟器都会命中，实测 140 个游戏项目里 47 个是这类误判，
+    # 还顶掉了分类 Top 榜。正面词越加越乱，负词才能定向排除。
+    # 负词必须够精确：`!x86` 误杀 "PlayStation 1 emulator for x86-64"、`!shell`
+    # 误杀 "Shell script to set up RetroPie"、`!aws` 误杀 "Amazon Games launcher"
+    # ——只用不会与真游戏共现的词组。
+    - "!terminal"
+    - "!aws local"
+    - "!aws emulator"
+    - "!x86 pc"
+    - "!cpu emulator"
+    - "!ssh"
+    # 引擎/框架/服务端属于「游戏开发」而非「游戏」。`open source game engine`、
+    # `strategy game engine` 都含正面短语，只能靠负词把它们挡回去
+    # （godot/OpenRA/nakama/LumixEngine 实测被抢过）。
+    - "!game engine"
+    - "!game framework"
+    - "!game server"
+    - "!game backend"
+    - "!game development"
+    # retro 是设计圈常用词（gruvbox 配色、8bitcn-ui 组件库都自称 retro），
+    # 排除这些非游戏语境。只留两条最精确的——`!design system` 会误伤
+    # "coordination system" 类描述（Claude-Code-Game-Studios 实测被误杀）。
+    - "!color scheme"
+    - "!theme"
   游戏开发:
     - 游戏引擎
     - game engine

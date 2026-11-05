@@ -1,6 +1,6 @@
 # AGENTS.md — STARPICK（QuanWangSouSuo）
 
-GitHub 公开项目手动发现与下载引导工具：用户在采集中心手动触发搜索 GitHub 高质量中文友好项目，按分类入库（SQLite），FastAPI 提供 JSON API 并托管 Vue3 前端构建产物。**采集与项目更新检查均为手动触发（2026-10-24 起），调度器只留数据库备份与应用自更新两个后台任务。**
+STARPICK 是一个多平台开源项目发现与下载引导工具：用户在采集中心手动触发搜索 GitHub、Codeberg、Gitee 项目，按分类入库（SQLite），FastAPI 提供 JSON API 并托管 Vue3 前端构建产物。**采集与项目更新检查均为手动触发（2026-10-24 起），调度器只留数据库备份与应用自更新两个后台任务。**
 
 ## 技术栈
 

@@ -127,6 +127,10 @@ def build_category_queries(keywords: list[str], min_stars: int, pushed_cutoff: s
         kw = (kw or "").strip()
         if not kw:
             continue
+        # 负关键词（`!` 前缀）只用于本地复检，不进 GitHub 查询串：
+        # GitHub 的 NOT 运算符计数进 5 运算符上限，且服务端排除不如本地精确
+        if kw.startswith("!"):
+            continue
         if _CJK_RE.search(kw) or len(kw.split()) > 1:
             terms.append(f'"{kw}"')
         else:
@@ -152,6 +156,21 @@ def _pushed_cutoff(max_inactive_days: int) -> str:
 
 # 无边界要求域代码（camel/下划线拼接）：TVBoxOSC、m3u8 流工具等
 _SUBSTR_WORDS = {"tvbox"}
+
+
+def _phrase_pattern(phrase: str) -> re.Pattern:
+    """多词英文关键词 → 相邻短语模式（词间允许空白/连字符，不跨句）。
+
+    为什么不用「各词独立出现」的 AND：`open source game` 在 godot 上会成立
+    （描述里有 "3D game engine"、topics 里有 "open-source"），导致 70 个
+    「游戏开发」项目被判进「游戏」。相邻匹配才符合"这是一个短语"的原意。
+
+    词间允许的分隔：空格、连字符、下划线——`game-engine` 与 `game engine`
+    在 GitHub topics 里都常见，两种写法都要命中。
+    """
+    parts = [re.escape(w) for w in phrase.split() if w]
+    body = r"[\s_-]+".join(parts)
+    return re.compile(r"\b" + body + r"\b")
 
 
 def _english_word_pattern(word: str) -> re.Pattern:
@@ -730,6 +749,12 @@ class Collector:
           本地不放宽会误杀合法结果），\\b 词边界防 rag⊂storage 类误配
         - 含数字/连字符的短代码（m3u8 / yt-dlp / tvbox）用子串——N_m3u8DL-RE、
           TVBoxOSC 这类无边界写法靠 \\b 匹配不到
+        - **`!` 前缀 = 负关键词**：命中任一负词则整个分类不成立（见下）
+
+        负关键词的动机（2026-11 实测）：`游戏` 分类收裸词 `emulator`，但英文里
+        *terminal emulator*（alacritty/ghostty/wezterm 各 6 万星）、*AWS emulator*、
+        *x86 emulator* 都用这个词——140 个游戏项目里 47 个是这类误判，还顶掉了
+        分类 Top 榜。逐个补正面词治不了歧义，加负词（`!terminal` 等）才是正解。
         """
         cats: dict[str, list[str]] = {k: list(v) for k, v in self.cfg.categories.items()}
         for row in self.db.list_custom_categories():
@@ -743,13 +768,26 @@ class Collector:
                 kw = (kw or "").strip()
                 if not kw:
                     continue
+                # `!` 前缀 = 负关键词（排除项），编译规则与正面词一致
+                negative = kw.startswith("!")
+                if negative:
+                    kw = kw[1:].strip()
+                    if not kw:
+                        continue
                 low = kw.lower()
                 if _CJK_RE.search(kw):
-                    compiled.append(("sub", [re.compile(re.escape(low))]))
+                    pats = [re.compile(re.escape(low))]
+                    compiled.append(("neg_sub" if negative else "sub", pats))
+                elif len(low.split()) == 1:
+                    pats = [_english_word_pattern(low)]
+                    compiled.append(("neg_words" if negative else "words", pats))
                 else:
-                    compiled.append(("words", [
-                        _english_word_pattern(w) for w in low.split()
-                    ]))
+                    # 多词英文必须是**相邻短语**，不能是「各词都出现」的宽松 AND。
+                    # 踩坑：`open source game` 曾用 AND 语义，导致 godot 的描述
+                    # （"...3D game engine" + topics "open-source"）三词俱在而误判
+                    # 进「游戏」，把 70 个「游戏开发」项目抢走。相邻匹配才是原意。
+                    pats = [_phrase_pattern(low)]
+                    compiled.append(("neg_words" if negative else "words", pats))
             if compiled:
                 patterns.append((name, compiled))
         return patterns
@@ -1430,6 +1468,9 @@ def _match_categories(item: dict, patterns: list[tuple[str, list]]) -> list[str]
 
     匹配文本 = 名称 + 简介 + topics（比 GitHub 查询的 in:name,description 略宽，
     topics 命中能提高发现轮的归类召回）。
+
+    分类内判定顺序：先看负关键词（`neg_*`），命中任一则该分类直接不成立；
+    再按原规则匹配正面词。负词存在的意义见 `Collector._category_patterns`。
     """
     text = " ".join([
         str(item.get("name") or ""),
@@ -1440,14 +1481,26 @@ def _match_categories(item: dict, patterns: list[tuple[str, list]]) -> list[str]
         return []
     hits: list[str] = []
     for name, compiled in patterns:
+        # 负关键词优先：命中即排除，不再看正面词
+        excluded = False
+        for kind, pats in compiled:
+            if kind == "neg_sub" and pats[0].search(text):
+                excluded = True
+                break
+            if kind == "neg_words" and all(p.search(text) for p in pats):
+                excluded = True
+                break
+        if excluded:
+            continue
         for kind, pats in compiled:
             if kind == "sub":
                 if pats[0].search(text):
                     hits.append(name)
                     break
-            elif all(p.search(text) for p in pats):
-                hits.append(name)
-                break
+            elif kind == "words":
+                if all(p.search(text) for p in pats):
+                    hits.append(name)
+                    break
     return hits
 
 
