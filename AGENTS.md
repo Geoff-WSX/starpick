@@ -122,6 +122,29 @@ packaging/               # 桌面打包：spec/双平台构建脚本/Inno 配置
   - **鉴权错误必须往上抛**：`search_repositories` 在「一条没搜到 + 有 auth 错误」时 `raise`，`_search_category` 对 `kind=="auth"` 也 `raise`，`collect_once` 有专门的 `except PlatformError` 把原文写进轮次 error。否则用户看到的是「本轮未搜索到任何候选」，会误判成 Gitee 没数据。
 - **已知遗留（关键词表）**：Codeberg 高星项目命中率低（9 个测试项目仅 3 个能归类），且 `dnkl/foot`（Wayland 终端）因含 `emulator` 被误归「游戏」。这是既有中文关键词表的通用性缺陷（GitHub 侧同样存在），修它会影响 1952 个存量项目，需单独立项。
 
+## 平台选型调研结论（2026-11 实测，避免重复踩坑）
+
+已接入：**GitHub / Codeberg / Gitee**。下列平台全部经真实请求验证，结论是不接，**不要因为「看着像就该支持」重新调研**（除非对方 API 有变更公告）：
+
+| 平台 | 实测结果 | 不接原因 |
+|---|---|---|
+| **AtomGit**（开放原子） | `/api/v5/search?q=&type=repo` **匿名可搜且支持中文**（`q=视频` 报 total=4516，能搜到 MoneyPrinterTurbo 等中文项目） | **分页失效 + 排序失效**：`page=1/2/3` 返回完全相同的数据、每页固定 10 条；试过 `sort`/`sort_by`/`order_by`/`sort_field`/`sort=star_count`/`sort=stars` 六种写法全部与默认一致。等于每关键词最多 10 条且无法取高星——作为发现源不可用。另：README raw 返回 HTML 页面（非 markdown）、无 Release API（端点 404/401） |
+| **GitLink**（新一代开源平台） | 所有 API 路径非法 | `/api/repos`、`/api/repos/search` 等返回 **HTML 页面（HTTP 200 假成功）** 或 `{"status":404}`；无可用 JSON API |
+| **CNB**（cnb.cool） | 搜索需鉴权 | `api.cnb.cool/v1/search` 返 401；`cnb.cool/api/search` 返 404 HTML 页面 |
+| **GitCode** | 与 AtomGit 同源 | `api.gitcode.com` 直接转发 AtomGit 的鉴权逻辑，同样 401 |
+| **gitea.com** | 技术上完全可用（匿名搜索 / README 200 / Gitea 系 API） | **数据量太小**：全站最高仅 409 星（xorm/xorm），头部分布远低于 STARPICK 的推荐门槛 |
+| **GitLab**（gitlab.com） | 技术最完整（匿名搜索 / raw README / Release 带 assets_links 全可用） | **直连被墙**，必须走代理——与 GitHub 同一个痛点，加了不解决任何问题。若将来有国内镜像可重新评估 |
+| **SourceHut** | 308 重定向，无搜索 API | — |
+| **Framagit** | 连不上 | — |
+| **Bitbucket** | `/2.0/repositories` 搜索端点 404 | — |
+| **SourceForge** | 直连 403（反爬拦截） | — |
+| **Flathub / Snapcraft / Docker Hub / HuggingFace / npm / PyPI / F-Droid** | 部分可访问 | **定位不符**：这些是「软件分发站 / 包仓库 / 模型库」，不是代码托管。没有 star、没有 README 主体、`full_name` 概念不成立，「下载即用的软件」这个核心定位也无法映射。接进来只会污染数据模型 |
+
+关键判别方法（以后再遇到候选平台，先跑这三步）：
+1. `curl` 搜索端点看返回的是 **JSON 还是 HTML**——假 200 返回 HTML 是常见陷阱（GitLink / CNB 都这样）
+2. **翻页比对**：`page=1` 与 `page=2` 是否返回不同数据（AtomGit 就死在这里）
+3. **星数量级抽样**：`sort=stars` 取前 10 条看最高星，低于 ~500 的平台对 STARPICK 没有推荐价值（Codeberg 是特例——它有 6993 星的 zig，且走「全站榜单」而非关键词搜索）
+
 ## 界面国际化（2026-10-29 落地，v1.3 起）
 
 - **中英切换**：顶栏语言按钮（日夜按钮旁，显示目标语言「EN/中」），localStorage `starpick-lang` 记忆，`<html lang>` 同步。
