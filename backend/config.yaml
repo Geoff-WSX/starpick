@@ -44,10 +44,11 @@ sources:
   enabled:
     - github
     - codeberg
+    - gitee             # 需在设置页配置 Gitee Token（搜索接口匿名不可用，未配则跳过该平台）
   min_stars:
     github: 200
     codeberg: 20        # Codeberg 星数普遍很低，20 星已属于较受关注的项目
-    gitee: 100          # 预留：接入 Gitee 后生效
+    gitee: 100          # Gitee 上 Star 普遍低于 GitHub，阈值取中间值
 
 categories:
   影视:

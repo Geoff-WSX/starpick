@@ -22,16 +22,32 @@ from . import paths
 BASE_DIR = paths.backend_dir()          # backend/（开发）；打包后为只读资源根
 DEFAULT_CONFIG_PATH = paths.config_path()
 RUNTIME_TOKEN_FILE = paths.runtime_token_path()   # 前端设置页写入（权限 600）
+GITEE_TOKEN_FILE = paths.gitee_token_path()       # Gitee Token 独立文件（格式与 GitHub 不同源）
 
 TOKEN_PATTERN = re.compile(r"(ghp_|github_pat_|gho_|ghu_)[A-Za-z0-9_]+")
 
 # 已实现客户端的平台标识（新增平台时同步 app/platforms/__init__.py 的注册表与这里）
-KNOWN_SOURCES: frozenset[str] = frozenset({"github", "codeberg"})
+KNOWN_SOURCES: frozenset[str] = frozenset({"github", "codeberg", "gitee"})
+
+# Gitee 私人令牌的最小长度：官方令牌是 32 位十六进制串，这里只做宽松的长度下限，
+# 不做字符集限制（历史上出现过不同形态），真正的有效性由首次 API 调用验证。
+_GITEE_TOKEN_MIN_LEN = 16
 
 
 def is_valid_token(token: str) -> bool:
     """Token 格式校验：GitHub 个人访问令牌前缀。"""
     return bool(token and TOKEN_PATTERN.fullmatch(token.strip()))
+
+
+def is_valid_gitee_token(token: str) -> bool:
+    """Gitee 令牌格式校验（宽松：只查长度与无空白）。
+
+    Gitee 令牌没有 GitHub 那样的固定前缀，无法用正则严格校验；校验过严会把
+    合法令牌拒之门外，过松则让明显的手滑（粘贴成用户名）被写进文件。
+    折中：≥16 位且不含空白字符，实际有效性等首次搜索请求来验证。
+    """
+    t = (token or "").strip()
+    return len(t) >= _GITEE_TOKEN_MIN_LEN and not any(c.isspace() for c in t)
 
 
 def set_runtime_token(cfg: Config, token: str) -> str:
@@ -56,6 +72,32 @@ def clear_runtime_token(cfg: Config) -> None:
     cfg.runtime_token = ""
     try:
         RUNTIME_TOKEN_FILE.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def set_gitee_token(cfg: Config, token: str) -> str:
+    """保存并热生效 Gitee Token（写 .gitee_token；无环境变量回退来源）。"""
+    token = token.strip()
+    if not is_valid_gitee_token(token):
+        raise ConfigError("Gitee Token 格式非法：至少 16 位且不含空格")
+    cfg.gitee_token = token
+    try:
+        GITEE_TOKEN_FILE.write_text(token + "\n", encoding="utf-8")
+        try:
+            GITEE_TOKEN_FILE.chmod(0o600)
+        except OSError:
+            pass
+    except OSError as exc:
+        raise ConfigError(f"写入 Gitee Token 文件失败: {exc}") from exc
+    return token
+
+
+def clear_gitee_token(cfg: Config) -> None:
+    """清除 Gitee Token（该平台后续采集会被跳过）。"""
+    cfg.gitee_token = ""
+    try:
+        GITEE_TOKEN_FILE.unlink(missing_ok=True)
     except OSError:
         pass
 
@@ -99,6 +141,8 @@ class Config:
 
     token: str = ""
     runtime_token: str = ""   # 前端设置页保存的 Token（热生效，优先于环境变量）
+    # Gitee 私人令牌（前端设置页保存）：Gitee 搜索接口匿名不可用，无此 Token 时该平台被跳过
+    gitee_token: str = ""
     search_rate_per_minute: int = 10
     core_rate_per_hour: int = 60
     request_timeout: int = 15
@@ -174,6 +218,15 @@ def load_config(path: Path | str | None = None) -> Config:
         saved = RUNTIME_TOKEN_FILE.read_text(encoding="utf-8").strip()
         if is_valid_token(saved):
             cfg.runtime_token = saved
+
+    # Gitee Token 独立文件（无环境变量回退：Gitee 无标准 env 约定）
+    try:
+        if GITEE_TOKEN_FILE.exists():
+            saved_gitee = GITEE_TOKEN_FILE.read_text(encoding="utf-8").strip()
+            if is_valid_gitee_token(saved_gitee):
+                cfg.gitee_token = saved_gitee
+    except OSError:
+        pass  # 读不到就当未配置（该平台被跳过，不影响其它平台采集）
 
     def _get(section: str, key: str, default: Any) -> Any:
         sec = raw.get(section, {})

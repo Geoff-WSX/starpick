@@ -1,8 +1,9 @@
 <script setup lang="ts">
-// 设置弹窗：GitHub Token 配置（保存后热生效）+「关于」（版本 / 检查更新 / 一键更新）+「模型中转站」
+// 设置弹窗：GitHub + Gitee Token 配置（保存后热生效）+「关于」（版本 / 检查更新 / 一键更新）+「模型中转站」
 import { computed, ref, watch } from 'vue'
 import {
   fetchSettings, saveToken, clearToken, checkAppUpdate, fetchAppUpdateDownload, openExternal,
+  saveGiteeToken, clearGiteeToken,
   type SettingsState,
 } from '../api'
 import { t as i18nT } from '../composables/useI18n'
@@ -16,6 +17,11 @@ const error = ref('')
 const info = ref<SettingsState | null>(null)
 const tokenInput = ref('')
 const savedHint = ref('')
+
+// Gitee Token 独立输入/状态（与 GitHub Token 分开：格式与用途都不同）
+const giteeSaving = ref(false)
+const giteeInput = ref('')
+const giteeHint = ref('')
 
 // 选项卡：tab=「配置」（Token+限流）/「about」=「关于」/「models」=「模型中转站推荐」
 const tab = ref<'tab' | 'about' | 'models'>('tab')
@@ -43,6 +49,8 @@ watch(
       tab.value = 'tab'
       tokenInput.value = ''
       savedHint.value = ''
+      giteeInput.value = ''
+      giteeHint.value = ''
       checkError.value = ''
       load()
     }
@@ -75,6 +83,44 @@ async function remove() {
     error.value = e instanceof Error ? e.message : i18nT('settings_clear_fail')
   } finally {
     saving.value = false
+  }
+}
+
+// ---- Gitee Token（搜索接口匿名不可用，必须有它才能采 Gitee） ----
+async function submitGitee() {
+  const t = giteeInput.value.trim()
+  if (!t) return
+  giteeSaving.value = true
+  error.value = ''
+  try {
+    const r = await saveGiteeToken(t)
+    if (info.value) {
+      info.value.has_gitee_token = r.has_gitee_token
+      info.value.masked_gitee_token = r.masked_gitee_token
+    }
+    giteeInput.value = ''
+    giteeHint.value = i18nT('settings_gitee_saved')
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : i18nT('settings_gitee_save_fail')
+  } finally {
+    giteeSaving.value = false
+  }
+}
+
+async function removeGitee() {
+  giteeSaving.value = true
+  error.value = ''
+  try {
+    const r = await clearGiteeToken()
+    if (info.value) {
+      info.value.has_gitee_token = r.has_gitee_token
+      info.value.masked_gitee_token = r.masked_gitee_token
+    }
+    giteeHint.value = i18nT('settings_gitee_cleared')
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : i18nT('settings_gitee_clear_fail')
+  } finally {
+    giteeSaving.value = false
   }
 }
 
@@ -224,6 +270,35 @@ function close() {
               <button v-if="info?.has_token" class="btn ghost" :disabled="saving" @click="remove">{{ i18nT('settings_token_clear') }}</button>
             </div>
             <div v-if="savedHint" class="settings-hint ok-hint">{{ savedHint }}</div>
+          </div>
+
+          <!-- Gitee Token 配置（Gitee 搜索接口匿名不可用，必须有它才能采 Gitee） -->
+          <div class="settings-group">
+            <div class="settings-title">
+              <span>{{ i18nT('settings_gitee_title') }}</span>
+              <span class="tag" :class="{ upd: info?.has_gitee_token }">
+                {{ info?.has_gitee_token ? i18nT('settings_token_configured') : i18nT('settings_gitee_none') }}
+              </span>
+            </div>
+            <p class="settings-desc">{{ i18nT('settings_gitee_desc') }}</p>
+            <div v-if="info?.has_gitee_token" class="settings-current">
+              {{ i18nT('settings_token_current') }}：<code class="token-mask">{{ info.masked_gitee_token }}</code>
+              <span class="dim">{{ i18nT('settings_token_masked') }}</span>
+            </div>
+            <div class="settings-row">
+              <input
+                v-model="giteeInput"
+                class="settings-input"
+                type="password"
+                :placeholder="i18nT('settings_gitee_placeholder')"
+                autocomplete="off"
+                spellcheck="false"
+                @keyup.enter="submitGitee"
+              />
+              <button class="btn" :disabled="giteeSaving || !giteeInput.trim()" @click="submitGitee">{{ i18nT('settings_token_save') }}</button>
+              <button v-if="info?.has_gitee_token" class="btn ghost" :disabled="giteeSaving" @click="removeGitee">{{ i18nT('settings_token_clear') }}</button>
+            </div>
+            <div v-if="giteeHint" class="settings-hint ok-hint">{{ giteeHint }}</div>
           </div>
 
           <!-- 限流状态 -->

@@ -30,13 +30,17 @@ from .collector import Collector
 from .config import (
     Config,
     ConfigError,
+    clear_gitee_token,
     clear_runtime_token,
+    is_valid_gitee_token,
     is_valid_token,
     load_config,
+    set_gitee_token,
     set_runtime_token,
 )
 from .db import Database
 from .github_api import resolve_repo_path, variant_lang
+from .platforms import missing_source_requirements
 
 APP_VERSION = "1.3"
 # 项目仓库地址（设置弹窗「关于」分组展示 + 更新检查）；仓库转公开后无需改代码，
@@ -742,6 +746,38 @@ def clear_token() -> dict[str, Any]:
     }
 
 
+@app.post("/api/settings/gitee-token", response_model=dict[str, Any])
+def save_gitee_token(body: TokenIn) -> dict[str, Any]:
+    """保存并热生效 Gitee Token（Gitee 搜索接口匿名不可用，没有它该平台会被跳过）。"""
+    cfg = state.cfg
+    token = body.token.strip()
+    if not is_valid_gitee_token(token):
+        raise HTTPException(status_code=422,
+                            detail="Gitee Token 格式非法：至少 16 位且不含空格")
+    try:
+        set_gitee_token(cfg, token)
+    except ConfigError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    # 热生效：Gitee 客户端只在有 token 时才实例化，必须重建字典
+    if state.collector is not None:
+        state.collector.rebuild_platform_clients()
+    return {
+        "ok": True,
+        "has_gitee_token": bool(cfg.gitee_token),
+        "masked_gitee_token": _mask_token(cfg.gitee_token),
+    }
+
+
+@app.post("/api/settings/gitee-token/clear", response_model=dict[str, Any])
+def clear_gitee_token_endpoint() -> dict[str, Any]:
+    """清除 Gitee Token（该平台后续采集会被跳过，不影响其它平台）。"""
+    cfg = state.cfg
+    clear_gitee_token(cfg)
+    if state.collector is not None:
+        state.collector.rebuild_platform_clients()
+    return {"ok": True, "has_gitee_token": False, "masked_gitee_token": ""}
+
+
 @app.post("/api/app/update-check", response_model=dict[str, Any])
 def trigger_app_update_check() -> dict[str, Any]:
     """手动触发应用更新检查（设置弹窗「关于」的「立即检查」按钮）。
@@ -824,7 +860,13 @@ def categories() -> dict[str, Any]:
                     custom_en[row["name"]] = kw
                     break
     return {"categories": names, "counts": counts, "custom_en": custom_en,
-            "sources": _source_counts()}
+            "sources": _source_counts(),
+            # 启用但缺少运行前提的平台 → 原因（前端据此在 chip 上标「未配置」）
+            "sources_missing": missing_source_requirements(state.cfg)
+            if state.cfg else {},
+            # 已启用平台清单：即使某平台暂无项目，采集中心也要能选它
+            "sources_enabled": list(state.cfg.enabled_sources) if state.cfg else [],
+            "has_gitee_token": bool(state.cfg.gitee_token) if state.cfg else False}
 
 
 def _source_counts() -> dict[str, int]:

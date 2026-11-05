@@ -61,9 +61,11 @@ const customCatKeywords = ref('')
 const updateCats = ref<string[]>([])
 
 // 来源平台选择：采集与更新各自独立的多选（空数组=全部启用平台）。
-// 可选平台取自 /api/categories 的 sources（库内实际存在的来源）而非硬编码，
-// 避免给用户一个勾了也没数据的平台。
+// 可选平台取自 /api/categories 的 sources_enabled（已启用平台，即使暂无项目），
+// sources 给出各平台项目数，sources_missing 给出「启用但缺前提」的平台。
 const allSources = ref<string[]>([])
+const sourceCounts = ref<Record<string, number>>({})
+const sourcesMissing = ref<Record<string, string>>({})
 const collectSources = ref<string[]>([])
 const updateSources = ref<string[]>([])
 
@@ -287,15 +289,17 @@ watch(
     if (open) {
       fetchCategories().then((r) => {
         allCategories.value = r.categories ?? []
-        // 来源 chips 只列库内实际有数据的平台（GitHub 恒在），按项目数降序
+        // 来源 chips 列「已启用平台」（即使暂无项目也能选，因为采集正是要往里填数据）；
+        // 排序：GitHub 固定首位，其余按库内项目数降序
         const counts = r.sources ?? {}
-        allSources.value = Object.keys(counts)
-          .filter((s) => (counts[s] ?? 0) > 0)
-          .sort((a, b) => {
-            if (a === 'github') return -1
-            if (b === 'github') return 1
-            return (counts[b] ?? 0) - (counts[a] ?? 0)
-          })
+        sourceCounts.value = counts
+        sourcesMissing.value = r.sources_missing ?? {}
+        const enabled = r.sources_enabled ?? Object.keys(counts)
+        allSources.value = [...enabled].sort((a, b) => {
+          if (a === 'github') return -1
+          if (b === 'github') return 1
+          return (counts[b] ?? 0) - (counts[a] ?? 0)
+        })
       }).catch(() => { /* 后端暂不可用时保持空列表 */ })
       fetchCollectParams().then((p) => {
         collectParams.value = p
@@ -420,9 +424,10 @@ function fmtTimeShort(iso: string): string {
               v-for="s in allSources"
               :key="s"
               class="chip"
-              :class="{ active: collectSources.includes(s) }"
+              :class="{ active: collectSources.includes(s), 'chip-warn': !!sourcesMissing[s] }"
+              :title="sourcesMissing[s] ? t('collect_source_not_ready') : undefined"
               @click="toggleCollectSource(s)"
-            >{{ SOURCE_LABELS[s] ?? s }}</button>
+            >{{ SOURCE_LABELS[s] ?? s }}<span v-if="sourcesMissing[s]" class="chip-warn-mark">!</span></button>
           </div>
         </div>
         <span class="param-hint">{{ t('collect_cats_hint').replace('{n}', String(collectParams?.per_category_max ?? '—')) }}</span>
@@ -487,9 +492,10 @@ function fmtTimeShort(iso: string): string {
               v-for="s in allSources"
               :key="s"
               class="chip"
-              :class="{ active: updateSources.includes(s) }"
+              :class="{ active: updateSources.includes(s), 'chip-warn': !!sourcesMissing[s] }"
+              :title="sourcesMissing[s] ? t('collect_source_not_ready') : undefined"
               @click="toggleUpdateSource(s)"
-            >{{ SOURCE_LABELS[s] ?? s }}</button>
+            >{{ SOURCE_LABELS[s] ?? s }}<span v-if="sourcesMissing[s]" class="chip-warn-mark">!</span></button>
           </div>
         </div>
         <span class="collect-hint">{{ t('collect_update_hint') }}</span>

@@ -396,6 +396,26 @@ a:hover {
   font-weight: 700;
 }
 
+/* 来源平台 chip：缺运行前提（如 Gitee 未配 Token）时用警示色描边 + 感叹号，
+   提示用户「选它能选，但采集时会被跳过」 */
+.chip-warn {
+  color: var(--warn, #fbbf24);
+  border-color: var(--warn, #fbbf24);
+  border-style: dashed;
+}
+
+.chip-warn.active {
+  background: var(--warn, #fbbf24);
+  border-color: var(--warn, #fbbf24);
+  border-style: solid;
+  color: var(--on-accent);
+}
+
+.chip-warn-mark {
+  margin-left: 4px;
+  font-weight: 800;
+}
+
 .lang-chip {
   margin-left: 2px;
 }

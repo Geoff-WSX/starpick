@@ -286,7 +286,17 @@ export function fetchCollectParams(): Promise<CollectParams> {
   return getJson('/api/collect/params')
 }
 
-export function fetchCategories(): Promise<{ categories: string[]; counts?: Record<string, number>; custom_en?: Record<string, string>; sources?: Record<string, number> }> {
+export function fetchCategories(): Promise<{
+  categories: string[]
+  counts?: Record<string, number>
+  custom_en?: Record<string, string>
+  sources?: Record<string, number>
+  /** 启用但缺运行前提的平台 → 原因（如 {gitee: 'gitee_token_missing'}） */
+  sources_missing?: Record<string, string>
+  /** 已启用的平台清单（即使暂无项目，采集中心也要能选） */
+  sources_enabled?: string[]
+  has_gitee_token?: boolean
+}> {
   return getJson('/api/categories')
 }
 
@@ -585,10 +595,40 @@ export interface SettingsState {
   app_update: AppUpdateState
   /** 部署形态：desktop=桌面安装包 / web=本地网页服务 */
   deployment: 'desktop' | 'web'
+  /** Gitee Token 是否已配置（Gitee 搜索必需，未配则该平台被跳过） */
+  has_gitee_token?: boolean
+  masked_gitee_token?: string
 }
 
 export function fetchSettings(): Promise<SettingsState> {
   return getJson('/api/settings')
+}
+
+/** 保存 Gitee Token（搜索接口匿名不可用，必须有它才能采 Gitee） */
+export async function saveGiteeToken(token: string): Promise<{
+  ok: boolean; has_gitee_token: boolean; masked_gitee_token: string
+}> {
+  const resp = await fetch('/api/settings/gitee-token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  })
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => null)
+    throw new Error(body?.detail ?? `HTTP ${resp.status}`)
+  }
+  return resp.json()
+}
+
+export async function clearGiteeToken(): Promise<{
+  ok: boolean; has_gitee_token: boolean; masked_gitee_token: string
+}> {
+  const resp = await fetch('/api/settings/gitee-token/clear', { method: 'POST' })
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => null)
+    throw new Error(body?.detail ?? `HTTP ${resp.status}`)
+  }
+  return resp.json()
 }
 
 /** 手动触发应用更新检查（后台执行立即返回；结果稍后由 fetchSettings 轮询读取） */

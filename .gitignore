@@ -13,6 +13,10 @@ logs/
 
 # 运行时 Token（设置页保存、热生效；绝不提交）
 backend/.runtime_token
+backend/.gitee_token
+# 打包后 Token 落在用户数据目录，同名文件可能在别处出现——按名字兜底
+.gitee_token
+.runtime_token
 
 # 前端构建产物与依赖
 frontend/node_modules/

@@ -371,6 +371,14 @@ class Collector:
         """热更新 GitHub Token（前端设置页保存后立即生效，无需重启）。"""
         self.client.apply_token(token)
 
+    def rebuild_platform_clients(self) -> None:
+        """按当前配置重建平台客户端字典（Gitee Token 保存/清除后调用）。
+
+        Gitee 无 Token 时不实例化，所以它存/清 Token 后必须重建，否则：
+        配了 Token 仍然采不到（旧的空字典），或清了 Token 还在用旧 token 请求。
+        """
+        self.clients = build_platform_clients(self.cfg, self.client)
+
     def _client_for(self, source: str):
         """取某来源的平台客户端；未启用的来源返回 None（调用方跳过）。"""
         return self.clients.get(source or "github")
@@ -445,6 +453,12 @@ class Collector:
                 summary.get("stats", {}),
                 summary.get("error", ""),
             )
+        except PlatformError as exc:
+            # 平台级致命错误（目前只有 Gitee Token 失效会走到这里）：错误文案
+            # 本身就是给用户看的，不要加类名前缀污染历史记录
+            log.error("采集任务因平台错误终止: %s", exc)
+            self.db.finish_round(round_id, "failed", {}, {}, str(exc))
+            summary = {"status": "failed", "error": str(exc)}
         except Exception as exc:  # 兜底：任何异常都要落库，保证下一轮能跑
             log.exception("采集任务异常终止")
             self.db.finish_round(
@@ -521,13 +535,12 @@ class Collector:
             client = self._client_for(src)
             src_min_stars = self._source_min_stars(src, explicit_min_stars)
             label = f"（{SOURCE_LABELS.get(src, src)}）" if len(active_sources) > 1 else ""
-            if src == "github":
-                # GitHub 按分类逐个搜索（每分类一条查询构造，召回率最高）
-                per_category_items = None
-            else:
-                # 非 GitHub 平台走「全站榜单 + 本地归类」：榜单一次拉取后在本地
-                # 分发给各分类（Codeberg 按分类关键词搜只能捞到低星凑数仓库，
-                # 详见 platforms/codeberg.py 的说明）。避免同一份榜单被拉 12 次。
+            # 平台搜索模式分两类：
+            # - GitHub / Gitee：按分类关键词逐个搜（召回率最高，两家的搜索都支持
+            #   关键词 + 星数排序，Gitee 还能搜中文）
+            # - Codeberg：榜单模式（按分类关键词只能捞到低星凑数仓库，改为拉全站
+            #   高星榜后本地归类；榜单只拉一次再分发给各分类，避免拉 12 遍）
+            if src == "codeberg":
                 self.progress.set(
                     message=f"正在拉取榜单{label}…",
                     current_category="",
@@ -541,7 +554,8 @@ class Collector:
                 except PlatformError as exc:
                     log.error("榜单拉取失败%s: %s", label, exc)
                     per_category_items = []
-                categories_summary.setdefault(f"__{src}_total__", len(per_category_items))
+            else:
+                per_category_items = None
             for category, keywords in cats.items():
                 self.progress.set(
                     message=f"正在分类「{category}」{label}" if per_category_items is None
@@ -667,12 +681,17 @@ class Collector:
                     log.error("分类 %s 搜索失败: %s", category, exc)
             raw_items = items
         else:
-            # 其它平台：关键词原样交给客户端（Codeberg 当前实现忽略关键词走榜单）
+            # 其它平台：关键词原样交给客户端（Codeberg 忽略关键词走榜单，Gitee 按词搜）
             try:
                 raw_items = client.search_repositories(
                     keywords, min_stars=min_stars, per_page=50, max_items=per_cat,
                 )
             except PlatformError as exc:
+                # 鉴权失败必须往外抛：静默返回空会让整轮以「未搜索到任何候选」
+                # 收尾，用户看到的是「Gitee 没数据」而不是「Token 无效」。
+                # 其它错误（网络抖动/单次限流）仍按「该分类跳过」处理，不拖垮整轮。
+                if exc.kind == "auth":
+                    raise
                 log.error("分类 %s（%s）搜索失败: %s", category, source, exc)
                 return [], 0
 

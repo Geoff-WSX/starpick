@@ -110,6 +110,17 @@ def runtime_token_path() -> Path:
     return backend_dir() / ".runtime_token"
 
 
+def gitee_token_path() -> Path:
+    """Gitee Token 文件（与 GitHub 分开存）。
+
+    Gitee 的私人令牌没有 `ghp_` 一类统一前缀，与 GitHub 的格式校验互不兼容，
+    共用一份文件会导致保存时被判为非法格式。也正因如此它单独一个文件。
+    """
+    if is_frozen():
+        return data_dir() / ".gitee_token"
+    return backend_dir() / ".gitee_token"
+
+
 def env_file_path() -> Path:
     """.env：打包后随数据目录（用户可放 GITHUB_TOKEN）；开发模式保持 backend/.env。"""
     if is_frozen():

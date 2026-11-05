@@ -94,10 +94,16 @@ packaging/               # 桌面打包：spec/双平台构建脚本/Inno 配置
 - 后端 `search_projects(platform=...)` 用 **带引号 LIKE `%"Windows"%`** 精确匹配 platforms JSON 数组——裸 LIKE 会让 Web 命中 Windows，测试锁定了该行为。
 - 语言组「中文」是**中文友好口径**（`zh=1`，含简介英文但中文友好的项目，约 430 个），不是简介语言判定；「英文」才是 `lang=en`。组内严格单选（`isLangActive`）。
 
-## 多平台采集（2026-11 落地，Codeberg 已接入）
+## 多平台采集（2026-11 落地，GitHub / Codeberg / Gitee）
 
 - **架构**：`backend/app/platforms/` 是平台抽象层。`PlatformClient` 契约只有三方法——`search_repositories(keywords, min_stars, ...)` / `get_readme(bare_name)` / `get_latest_release(bare_name)`，返回**统一 GitHub 语义**字典（`stars`/`topics`/`assets`…），让 collector 下游（复检/打分/入库/回填）不感知平台差异。新增平台 = 加一个 `platforms/xxx.py` + 在 `config.KNOWN_SOURCES` 与 `build_platform_clients` 注册。
-- **`full_name` 的双形态（关键）**：平台内部调用用**裸名** `owner/repo`；入库主键用**限定名** `source:owner/repo`（GitHub 不加前缀，保持与存量 1945 条一致）。这正是为了绕开 `projects.full_name` 的 UNIQUE 约束——`forgejo/forgejo` 在 GitHub 与 Codeberg 同时存在，是两个独立项目。转换用 `platforms.qualify` / `split_qualified`；前端用 `api.ts` 的 `bareFullName()` **剥掉前缀再展示**（曾把 `codeberg:ziglang/zig` 直接印在卡片标题上，是 bug）。
+- **两类搜索模式（别一刀切）**：`collector._run` 按平台分派——
+  - **关键词模式**（github / gitee）：逐分类调 `client.search_repositories(keywords, ...)`，召回率最高；
+  - **榜单模式**（codeberg）：只拉一次全站高星榜，再本地分发给各分类（`preloaded=`）。理由见下条。
+  曾把「非 GitHub 一律走榜单」写成 `else` 分支，导致 Gitee 被传入空关键词、白跑一轮返回 0 结果。
+- **Codeberg 必须按「全站高星榜」采，不能按分类关键词**：实测按分类关键词只能捞到 1~12 星的课程/练习仓库，而真正的高星项目（zig 6993★、forgejo 5768★、Gadgetbridge 2016★）与 12 个分类关键词几乎不重合。所以 `CodebergClient.search_repositories` **忽略 keywords**、按 star 倒序翻页拉榜单，交给 collector 的 `_match_categories` 本地归类，归不上的丢弃。
+- **`full_name` 的双形态（关键）**：平台内部调用用**裸名** `owner/repo`；入库主键用**限定名** `source:owner/repo`（GitHub 不加前缀，保持与存量一致）。这正是为了绕开 `projects.full_name` 的 UNIQUE 约束——`forgejo/forgejo` 在 GitHub 与 Codeberg 同时存在，是两个独立项目。转换用 `platforms.qualify` / `split_qualified`；前端用 `api.ts` 的 `bareFullName()` **剥掉前缀再展示**（曾把 `codeberg:ziglang/zig` 直接印在卡片标题上，是 bug）。
+
 - **`source` 列**：`_SCHEMAS` 末尾追加，默认 `'github'`（存量免回填）。`_LIST_COLS`、`ProjectOut`、`FavoriteOut`、`list_projects_for_update` 都要带上它，否则前端/更新检查拿不到来源。
 - **Codeberg 必须按「全站高星榜」采，不能按分类关键词**：实测按分类关键词只能捞到 1~12 星的课程/练习仓库，而真正的高星项目（zig 6993★、forgejo 5768★、Gadgetbridge 2016★）与 12 个分类关键词几乎不重合。所以 `CodebergClient.search_repositories` **忽略 keywords**、按 star 倒序翻页拉榜单，交给 collector 的 `_match_categories` 本地归类，归不上的丢弃。collector 侧对非 GitHub 平台**一次拉取、分发到各分类**（`_search_category(preloaded=...)`），避免同一榜单被拉 12 次。
 - **榜单模式的两条坑**：① 空分类模式（某分类没有可编译关键词）若走「全部通过」，会让每个分类收下整份榜单 → `preloaded` 非空且无模式时直接返回空；② 同一项目可命中多个分类，**不要按 full_name 去重**——`_store` 靠重复候选把后续分类并入「附加分类」，去重会破坏跨界标注（有测试锁定）。
@@ -106,6 +112,14 @@ packaging/               # 桌面打包：spec/双平台构建脚本/Inno 配置
 - **`_to_candidate` 的 stars 兼容**：GitHub API 字段是 `stargazers_count`，平台客户端统一映射成 `stars`。只读前者会让所有非 GitHub 候选恒 0 星（已修，勿再改回）。
 - **Codeberg API 实测约束**：搜索 `q` 是短语匹配（`video player` 返 0）、中文关键词无索引（`q=视频` 恒空）、`limit` 上限 50、限流 2000 次/10 分钟（比 GitHub 匿名宽松得多）；README 走 `/api/v1/repos/{owner}/{repo}/raw/README.md` 自动用默认分支且不占配额；无 `/releases/latest` 端点，要从 `/releases` 数组里挑非 draft/prerelease 的第一条。
 - **前端来源筛选组**：位置在「平台」之后，整组仅在库内存在非 GitHub 项目时渲染（`/api/categories` 附带 `sources` 计数决定）。GitHub 项目**不显示来源徽标**（1945 条存量标了只是噪音），只有非 GitHub 才出现 `.source-badge`。
+- **Gitee 专属约束（2026-11 接入）**：
+  - **搜索必须 Token**：匿名调 `/search/repositories` 返回**空数组 `[]`（HTTP 200，不是报错）**，带无效 Token 才返 401。所以 `build_platform_clients` 在 `cfg.gitee_token` 为空时**根本不实例化** Gitee（否则白跑一轮静默得 0 结果），前端通过 `missing_source_requirements()` → `/api/categories` 的 `sources_missing` 拿到原因，chip 显示黄色感叹号。
+  - **Token 独立文件**：`backend/.gitee_token`（`paths.gitee_token_path()`，权限 600）。不能与 `.runtime_token` 共用——Gitee 令牌没有 `ghp_` 类前缀，共用会让 GitHub 的格式校验直接拒绝。**两个文件都必须在 .gitignore 里**（曾漏掉 `.gitee_token`，有泄漏风险）。Token 存/清后要调 `collector.rebuild_platform_clients()` 重建字典，否则热更新不生效。
+  - **只有搜索要鉴权**：仓库详情、README raw、releases 全部**匿名可读**，且**带失效 token 反而 401**（实测：匿名 200 / 假 token 401）。所以 `get_readme` / `get_latest_release` / `_default_branch` 都传 `auth=False`，避免 token 过期连带打断安装包探测。
+  - **README 必须按默认分支取**：Gitee 上 `3.0`、`dev` 这类非 main/master 分支极常见，硬编码 main/master 会大量 404。`_default_branch()` 查一次仓库详情并缓存。
+  - **无 topics 字段**：列表与详情的 `topics` 都是 null，分类匹配只能靠「名称 + 简介」，召回率天然低于 GitHub。
+  - **Release assets 多是源码包**：公开 API 只给自动生成的 `<tag>.zip` / `<tag>.tar.gz`，真二进制附件要登录态（匿名 `/releases/attachments` 返 40001）。`_is_source_archive()` 按 `/archive/refs/` URL 特征 + 「名字就是版本号」形态过滤，避免把源码压缩包当安装包装给用户（Gitee 客户端层过滤，不动通用 `_is_meta_asset`，因为 `.zip` 在 GitHub 上也可能是便携版）。
+  - **鉴权错误必须往上抛**：`search_repositories` 在「一条没搜到 + 有 auth 错误」时 `raise`，`_search_category` 对 `kind=="auth"` 也 `raise`，`collect_once` 有专门的 `except PlatformError` 把原文写进轮次 error。否则用户看到的是「本轮未搜索到任何候选」，会误判成 Gitee 没数据。
 - **已知遗留（关键词表）**：Codeberg 高星项目命中率低（9 个测试项目仅 3 个能归类），且 `dnkl/foot`（Wayland 终端）因含 `emulator` 被误归「游戏」。这是既有中文关键词表的通用性缺陷（GitHub 侧同样存在），修它会影响 1952 个存量项目，需单独立项。
 
 ## 界面国际化（2026-10-29 落地，v1.3 起）
