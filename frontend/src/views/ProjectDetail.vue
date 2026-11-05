@@ -295,10 +295,10 @@ function resolveReadme(
     const lang = variantLang(file)
     if (lang) {
       const label = inner.replace(/<[^>]+>/g, '').trim()
-      return `<a href="#readme-local" data-variant="${escapeHtmlAttr(p)}" data-lang="${escapeHtmlAttr(lang)}" data-label="${escapeHtmlAttr(label)}" class="lang-switch" title="在本站内查看该语言版本">${inner}</a>`
+      return `<a href="#readme-local" data-variant="${escapeHtmlAttr(p)}" data-lang="${escapeHtmlAttr(lang)}" data-label="${escapeHtmlAttr(label)}" class="lang-switch" title="${escapeHtmlAttr(t('readme_view_here'))}">${inner}</a>`
     }
     if (!p.includes('/') && DEFAULT_README_NAMES.some((n) => n.toLowerCase() === file.toLowerCase())) {
-      return `<a href="#readme-default" data-lang="default" class="lang-switch" title="在本站内切换语言">${inner}</a>`
+      return `<a href="#readme-default" data-lang="default" class="lang-switch" title="${escapeHtmlAttr(t('readme_switch_here'))}">${inner}</a>`
     }
     return m   // 其它相对路径的 HTML 链接保持原样（GitHub 页内跳转）
   })
@@ -312,11 +312,11 @@ function resolveReadme(
     const file = p.split('/').pop() || ''
     const lang = variantLang(file)
     if (lang) {
-      return `<a href="#readme-local" data-variant="${escapeHtmlAttr(p)}" data-lang="${escapeHtmlAttr(lang)}" data-label="${escapeHtmlAttr(text)}" class="lang-switch" title="在本站内查看该语言版本">${text}</a>`
+      return `<a href="#readme-local" data-variant="${escapeHtmlAttr(p)}" data-lang="${escapeHtmlAttr(lang)}" data-label="${escapeHtmlAttr(text)}" class="lang-switch" title="${escapeHtmlAttr(t('readme_view_here'))}">${text}</a>`
     }
     if (!p.includes('/') && DEFAULT_README_NAMES.some((n) => n.toLowerCase() === file.toLowerCase())) {
       // 只有仓库根目录的默认 README 才是「切回原文」；子目录 README.md（模块文档）走下方 GitHub 链接
-      return `<a href="#readme-default" data-lang="default" class="lang-switch" title="在本站内切换语言">${text}</a>`
+      return `<a href="#readme-default" data-lang="default" class="lang-switch" title="${escapeHtmlAttr(t('readme_switch_here'))}">${text}</a>`
     }
     return `[${text}](${base}/blob/HEAD/${p})`
   })
@@ -678,7 +678,7 @@ function back() {
             <span>{{ t('detail_health') }}</span>
             <span class="hint">{{ healthRangeLabel }} · {{ t('health_snapshots').replace('{n}', String(healthSnaps.length)) }}</span>
           </div>
-          <svg class="health-svg" viewBox="0 0 320 64" preserveAspectRatio="none" role="img" aria-label="Star 变化曲线">
+          <svg class="health-svg" viewBox="0 0 320 64" preserveAspectRatio="none" role="img" :aria-label="t('detail_health_aria')">
             <polygon :points="healthArea" fill="rgba(255,153,0,0.12)"></polygon>
             <polyline :points="healthPath" fill="none" stroke="#ff9900" stroke-width="2" stroke-linejoin="round"></polyline>
             <circle

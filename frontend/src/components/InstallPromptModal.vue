@@ -52,7 +52,7 @@ async function copyAll() {
     <div class="modal">
       <div class="modal-head">
         <h2>{{ t('prompt_title') }}</h2>
-        <button class="modal-close" title="关闭" @click="emit('close')">
+        <button class="modal-close" :title="t('collect_close')" @click="emit('close')">
           <svg class="modal-close-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
@@ -67,7 +67,7 @@ async function copyAll() {
 
       <div class="modal-history">
         <button class="btn" @click="copyAll">{{ t('prompt_copy_all') }}</button>
-        <button class="btn ghost" @click="emit('close')">关闭</button>
+        <button class="btn ghost" @click="emit('close')">{{ t('collect_close') }}</button>
       </div>
 
       <div v-if="toast" class="toast">{{ toast }}</div>

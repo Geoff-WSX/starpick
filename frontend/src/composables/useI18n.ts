@@ -12,10 +12,18 @@ const saved = (() => {
 })()
 const lang = ref<UiLang>(saved === 'en' ? 'en' : 'zh')
 
+// 首帧同步 <html lang>：index.html 硬编码 zh-CN，若用户在英语模式刷新页面，
+// 不在这里同步就会一直是 zh-CN（影响屏幕阅读器与浏览器翻译提示）。
+// setLang 只在「切换时」调 setAttribute，覆盖不到「加载时已是 en」的场景。
+if (typeof document !== 'undefined') {
+  document.documentElement.setAttribute('lang', lang.value === 'en' ? 'en' : 'zh-CN')
+}
+
 export function setLang(l: UiLang) {
   lang.value = l
   try { localStorage.setItem(LANG_KEY, l) } catch { /* 隐私模式忽略 */ }
-  document.documentElement.setAttribute('lang', l)
+  // 与 index.html 的 zh-CN 保持同一写法（en 无需区域码）
+  document.documentElement.setAttribute('lang', l === 'en' ? 'en' : 'zh-CN')
 }
 
 export function toggleLang() {

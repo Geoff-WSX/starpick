@@ -505,7 +505,7 @@ function fmtTimeShort(iso: string): string {
       <div v-if="updatePanelVisible" class="collect-panel update-panel" :class="{ done: !updateStatus?.running }">
         <div class="cp-head">
           <span class="cp-phase">{{ updateStatus?.running ? t('collect_update_phase') : t('collect_update_done') }}</span>
-          <span class="cp-msg">{{ updateStatus?.running ? updateStatus.message : '本次更新检查已结束' }}</span>
+          <span class="cp-msg">{{ updateStatus?.running ? updateStatus.message : t('collect_update_ended') }}</span>
         </div>
         <div v-if="updateStatus?.running" class="cp-bar">
           <div class="cp-bar-fill" :style="{ width: updatePct(updateStatus.done, updateStatus.total) }"></div>
@@ -515,7 +515,7 @@ function fmtTimeShort(iso: string): string {
           <span class="strong">{{ t('collect_update_found').replace('{n}', String(updateStatus?.updated)) }}</span>
           <span>{{ t('collect_update_nochange').replace('{n}', String(updateStatus?.nochange)) }}</span>
           <span v-if="(updateStatus?.failed ?? 0) > 0" class="err-text">{{ t('collect_update_failed').replace('{n}', String(updateStatus?.failed)) }}</span>
-          <span v-if="!updateStatus?.running && updateStatus?.updated_at" class="cp-time">完成 {{ fmtTimeShort(updateStatus?.updated_at ?? '') }}</span>
+          <span v-if="!updateStatus?.running && updateStatus?.updated_at" class="cp-time">{{ t('collect_update_at').replace('{time}', fmtTimeShort(updateStatus?.updated_at ?? '')) }}</span>
         </div>
       </div>
 

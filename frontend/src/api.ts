@@ -1,4 +1,5 @@
 // 后端 API 类型与封装（仅调用 JSON API，三层单向依赖）
+import { t } from './composables/useI18n'
 
 /**
  * 打开外部链接（外链统一切换点）。
@@ -199,7 +200,7 @@ export interface HealthResponse {
 async function getJson<T>(url: string): Promise<T> {
   const resp = await fetch(url)
   if (!resp.ok) {
-    throw new Error(`请求失败 ${resp.status}: ${url}`)
+    throw new Error(t('api_req_fail').replace('{status}', String(resp.status)).replace('{url}', url))
   }
   return resp.json() as Promise<T>
 }
@@ -277,7 +278,7 @@ export async function triggerRun(payload?: {
   })
   if (!resp.ok) {
     const body = await resp.json().catch(() => null)
-    throw new Error(body?.detail ?? `触发采集失败 ${resp.status}`)
+    throw new Error(body?.detail ?? t('api_collect_fail').replace('{status}', String(resp.status)))
   }
   return resp.json()
 }

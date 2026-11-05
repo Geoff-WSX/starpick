@@ -56,7 +56,11 @@ function toggle(name: string) {
 async function run() {
   if (!checked.value.size || busy.value) return
   const names = [...checked.value]
-  if (!confirm(`确定清除分类「${names.join('、')}」共 ${totalSelected.value} 个项目？\n收藏的项目会保留；删除前会自动备份数据库。`)) return
+  // 用本地化分类名：英文模式下不该冒出中文分类名
+  const msg = t('cleanup_confirm2')
+    .replace('{names}', names.map((c) => t('cat_' + c)).join(', '))
+    .replace('{n}', String(totalSelected.value))
+  if (!confirm(msg)) return
   busy.value = true
   error.value = ''
   try {

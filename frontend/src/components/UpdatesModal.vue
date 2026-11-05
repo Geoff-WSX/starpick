@@ -27,7 +27,7 @@ function fmtDuration(sec: number | undefined): string {
   if (sec < 60) return `${sec}s`
   const m = Math.floor(sec / 60)
   const s = Math.round(sec % 60)
-  return `${m}分${s}秒`
+  return t('updates_duration').replace('{m}', String(m)).replace('{s}', String(s))
 }
 
 function statusLabel(s: string): string {

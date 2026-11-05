@@ -127,7 +127,7 @@ function openInstallPrompt() {
       <span class="tag" :style="{ color: categoryColor, borderColor: categoryColor + '55' }">
         {{ t('cat_' + project.category) }}
       </span>
-      <span v-for="c in extraCategories" :key="c" class="tag extra-cat" :title="`跨界项目，同时属于「${c}」`">
+      <span v-for="c in extraCategories" :key="c" class="tag extra-cat" :title="t('detail_extra_cat_tip').replace('{c}', t('cat_' + c))">
         {{ t('cat_' + c) }}
       </span>
       <span v-if="project.lang" class="tag" :class="project.lang === 'zh' ? 'lang-zh' : 'lang-en'">

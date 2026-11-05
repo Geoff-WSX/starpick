@@ -120,7 +120,7 @@ async function loadProjects(append = false) {
     }
     total.value = data.total
   } catch (e) {
-    error.value = e instanceof Error ? e.message : '加载项目失败'
+    error.value = e instanceof Error ? e.message : t('detail_load_fail')
   } finally {
     if (append) loadingMore.value = false
     else loading.value = false

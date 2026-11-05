@@ -71,7 +71,7 @@ function onKeydown(e: KeyboardEvent) {
           <div class="picker-title">{{ project.full_name }}</div>
           <div class="picker-sub">{{ t('picker_sub').replace('{os}', currentOS || t('picker_unknown')) }}</div>
         </div>
-        <button class="modal-close" title="关闭" @click="emit('close')">
+        <button class="modal-close" :title="t('collect_close')" @click="emit('close')">
           <svg class="modal-close-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
@@ -95,8 +95,8 @@ function onKeydown(e: KeyboardEvent) {
           <div v-for="a in g.items" :key="a.url" class="pick-row" @click="downloadBest(a.url)">
             <div class="pick-name" :title="a.name">{{ a.name }}</div>
             <div class="pick-size">{{ formatSize(a.size) }}</div>
-            <button v-if="mirrorUrl(a.url)" class="btn dl small" @click.stop="downloadBest(a.url)">加速下载</button>
-            <button class="btn small" :title="a.url" @click.stop="download(a.url)">原地址</button>
+            <button v-if="mirrorUrl(a.url)" class="btn dl small" @click.stop="downloadBest(a.url)">{{ t('picker_dl') }}</button>
+            <button class="btn small" :title="a.url" @click.stop="download(a.url)">{{ t('picker_orig') }}</button>
           </div>
         </div>
         <div class="hint">{{ t('picker_arch_hint') }}</div>
