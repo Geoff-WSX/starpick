@@ -68,6 +68,18 @@ categories:
     - video streaming   # 短语匹配；裸词 streaming 会被 GitHub 词干匹配到 "streamed from disk" 的 ML 项目
     - vod
     - media player
+    # 2026-11 补：影视 App 的描述常用「媒体系统」「流媒体前端」「直播源」，
+    # 不含上面任何词（jellyfin/NewPipe/streamlink/kodi 类）。这几条是
+    # 影视专有表述，不会与「视频工具」（下载/解析/字幕）冲突。
+    - "media system"
+    - "streaming front-end"
+    - "video player"
+    - "直播源"
+    # ---- 负关键词 ----
+    # `anime` 的词形变体规则会命中 `animation`，于是动画引擎（anime.js）被当成
+    # 「动漫」收进来。只排除「动画引擎」这个明确的技术表述。
+    - "!animation engine"
+    - "!动画引擎"
   视频工具:
     - 视频下载
     - 视频解析
@@ -80,6 +92,17 @@ categories:
     - B站下载
     - 抖音下载
     - 媒体下载
+    # ---- 负关键词 ----
+    # `downloader` 太泛：视频/音频下载器之外，漫画、小说、torrent、Telegram 中转
+    # 机器人也全叫 downloader。实测 112 个视频工具里 17 个是漫画/小说下载器。
+    # 注意别加 `!translate`——pyvideotrans/VideoLingo/VideoCaptioner 是**视频**
+    # 翻译工具，属于本分类；只排除文本载体（漫画/小说/torrent/comic）。
+    - "!manga"
+    - "!comic"
+    - "!torrent"
+    - "!漫画"
+    - "!小说"
+    - "!novel"
   游戏:
     - 模拟器
     - emulator
@@ -247,6 +270,18 @@ categories:
     - speedtest
     - CDN
     - 网速
+    # ---- 负关键词 ----
+    # `mirror` 在英文里首要含义是「代码镜像仓库」，不是「镜像加速」。
+    # GitHub 上 FFmpeg/git/postgres/chromium/CMake/wireshark 等大量项目的简介
+    # 都是 "Mirror of https://..."，实测 104 个加速工具里 36 个是这类误判。
+    # 用负词排除这些形态，保留 `镜像站`/`download mirror` 这类真加速语义。
+    - "!mirror of"
+    - "!source code mirror"
+    - "!read-only mirror"
+    - "!official mirror"
+    - "!github mirror"
+    - "!git-ified"
+    - "!mirror repository"
   设计:
     - icon pack
     - 字体设计
@@ -280,6 +315,11 @@ categories:
     - 修图
     - animation
     - 动画
+    # ---- 负关键词 ----
+    # 中文子串 `动画` 会命中「动画图解算法」这类技术教程（hello-algo），
+    # 算法教学不是创作工具。
+    - "!algorithm"
+    - "!数据结构"
   音乐:
     - 音乐
     - music
@@ -301,3 +341,18 @@ categories:
     - pdf reader
     - kindle
     - 杂志
+    # 2026-11 补：PDF/电子书阅读器与笔记类工具的常见自称（sioyek/sumatrapdf/
+    # xournalpp/react-pdf 都只说 "PDF viewer"/"Book Reader"，不含 ebook reader）。
+    - "pdf viewer"
+    - "epub reader"
+    - "book reader"
+    - "reader app"
+    - "电子书阅读"
+    # ---- 负关键词 ----
+    # `新闻` 是阅读分类里最泛的词：股票分析、舆情监控、AI 日报都自称「实时新闻」，
+    # 但它们不是阅读器。实测 128 个阅读项目里 3 个是这类（TrendRadar、
+    # daily_stock_analysis、a-stock-data），它们同时命中 AI工具，去掉阅读不影响归属。
+    - "!股票"
+    - "!stock"
+    - "!舆情"
+    - "!trend monitor"

@@ -761,36 +761,7 @@ class Collector:
             kws = [k.strip() for k in (row["keywords"] or "").split(",") if k.strip()]
             if kws:
                 cats.setdefault(row["name"], kws)
-        patterns: list[tuple[str, list]] = []
-        for name, kws in cats.items():
-            compiled = []
-            for kw in kws:
-                kw = (kw or "").strip()
-                if not kw:
-                    continue
-                # `!` 前缀 = 负关键词（排除项），编译规则与正面词一致
-                negative = kw.startswith("!")
-                if negative:
-                    kw = kw[1:].strip()
-                    if not kw:
-                        continue
-                low = kw.lower()
-                if _CJK_RE.search(kw):
-                    pats = [re.compile(re.escape(low))]
-                    compiled.append(("neg_sub" if negative else "sub", pats))
-                elif len(low.split()) == 1:
-                    pats = [_english_word_pattern(low)]
-                    compiled.append(("neg_words" if negative else "words", pats))
-                else:
-                    # 多词英文必须是**相邻短语**，不能是「各词都出现」的宽松 AND。
-                    # 踩坑：`open source game` 曾用 AND 语义，导致 godot 的描述
-                    # （"...3D game engine" + topics "open-source"）三词俱在而误判
-                    # 进「游戏」，把 70 个「游戏开发」项目抢走。相邻匹配才是原意。
-                    pats = [_phrase_pattern(low)]
-                    compiled.append(("neg_words" if negative else "words", pats))
-            if compiled:
-                patterns.append((name, compiled))
-        return patterns
+        return compile_category_patterns(cats)
 
     def _run_discovery(self, round_id: int, min_stars: int | None = None) -> dict[str, Any]:
         """发现轮：1~2 次搜索请求发现近期创建的高星新仓库，本地按分类关键词归类。
@@ -1461,6 +1432,53 @@ def _to_candidate(item: dict, category: str) -> dict:
         "topics": item.get("topics") or [],
         "category": category,
     }
+
+
+def compile_category_patterns(
+    cats: dict[str, list[str]],
+) -> list[tuple[str, list]]:
+    """把「分类名 → 关键词列表」编译成匹配模式（纯函数，无外部依赖）。
+
+    抽成模块级函数是为了让测试与离线审计脚本能在**不改配置、不连数据库**的
+    前提下模拟词表改动的影响面——`Collector._category_patterns` 只是先合并
+    自定义分类再调用它。
+
+    单个关键词的编译规则：
+    - 含中文 → 子串匹配（`模拟器`、`游戏Mod` 这类无词边界概念）
+    - 单个英文词 → 允许词形变体（agent → agents），\\b 边界防 rag⊂storage
+    - 多个英文词 → **相邻短语**（见 `_phrase_pattern` 的说明）
+    - `!` 前缀 → 负关键词（命中即排除整个分类）
+    """
+    patterns: list[tuple[str, list]] = []
+    for name, kws in cats.items():
+        compiled = []
+        for kw in kws:
+            kw = (kw or "").strip()
+            if not kw:
+                continue
+            # `!` 前缀 = 负关键词（排除项），编译规则与正面词一致
+            negative = kw.startswith("!")
+            if negative:
+                kw = kw[1:].strip()
+                if not kw:
+                    continue
+            low = kw.lower()
+            if _CJK_RE.search(kw):
+                pats = [re.compile(re.escape(low))]
+                compiled.append(("neg_sub" if negative else "sub", pats))
+            elif len(low.split()) == 1:
+                pats = [_english_word_pattern(low)]
+                compiled.append(("neg_words" if negative else "words", pats))
+            else:
+                # 多词英文必须是**相邻短语**，不能是「各词都出现」的宽松 AND。
+                # 踩坑：`open source game` 曾用 AND 语义，导致 godot 的描述
+                # （"...3D game engine" + topics "open-source"）三词俱在而误判
+                # 进「游戏」，把 70 个「游戏开发」项目抢走。相邻匹配才是原意。
+                pats = [_phrase_pattern(low)]
+                compiled.append(("neg_words" if negative else "words", pats))
+        if compiled:
+            patterns.append((name, compiled))
+    return patterns
 
 
 def _match_categories(item: dict, patterns: list[tuple[str, list]]) -> list[str]:

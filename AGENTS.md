@@ -120,7 +120,60 @@ packaging/               # 桌面打包：spec/双平台构建脚本/Inno 配置
   - **无 topics 字段**：列表与详情的 `topics` 都是 null，分类匹配只能靠「名称 + 简介」，召回率天然低于 GitHub。
   - **Release assets 多是源码包**：公开 API 只给自动生成的 `<tag>.zip` / `<tag>.tar.gz`，真二进制附件要登录态（匿名 `/releases/attachments` 返 40001）。`_is_source_archive()` 按 `/archive/refs/` URL 特征 + 「名字就是版本号」形态过滤，避免把源码压缩包当安装包装给用户（Gitee 客户端层过滤，不动通用 `_is_meta_asset`，因为 `.zip` 在 GitHub 上也可能是便携版）。
   - **鉴权错误必须往上抛**：`search_repositories` 在「一条没搜到 + 有 auth 错误」时 `raise`，`_search_category` 对 `kind=="auth"` 也 `raise`，`collect_once` 有专门的 `except PlatformError` 把原文写进轮次 error。否则用户看到的是「本轮未搜索到任何候选」，会误判成 Gitee 没数据。
-- **已知遗留（关键词表）**：Codeberg 高星项目命中率低（9 个测试项目仅 3 个能归类），且 `dnkl/foot`（Wayland 终端）因含 `emulator` 被误归「游戏」。这是既有中文关键词表的通用性缺陷（GitHub 侧同样存在），修它会影响 1952 个存量项目，需单独立项。
+- **已知遗留（关键词表）**：Codeberg 高星项目命中率低（9 个测试项目仅 3 个能归类）。~~`dnkl/foot` 因含 `emulator` 被误归「游戏」~~ —— 已于 2026-11 用负关键词机制修复，见下节。
+
+## 分类匹配：负关键词机制（2026-11 落地）
+
+分类准确性的核心问题不是「词不够多」，而是**同一个英文词在不同领域含义完全不同**。
+裸词 `emulator` 同时指「终端模拟器」（alacritty/ghostty/wezterm 各 6 万星）和
+「游戏机模拟器」（rpcs3/pcsx2/RetroArch）。补正面词治不了歧义，只能加负词。
+
+**语法**：分类关键词以 `!` 前缀表示排除项，命中任一则该分类整体不成立（负词优先于正面词）。
+
+**编译函数**：`compile_category_patterns()`（模块级纯函数）——`Collector._category_patterns`
+只是先合并 DB 里的自定义分类再调它。独立出来是为了让**离线脚本能在不改配置、不连库**
+的前提下模拟词表改动的影响面。
+
+**多词英文必须相邻匹配**（`_phrase_pattern`）：曾用「各词独立出现」的宽松 AND，
+`open source game` 因此把 godot（描述 "3D game engine" + topics "open-source"）
+判进「游戏」，一次性抢走 70 个「游戏开发」项目。相邻匹配（词间允许空格/连字符/
+下划线）才是短语的原意。
+
+**现有负词一览**（改词表前先看这里，都是踩过坑的）：
+
+| 分类 | 负词 | 挡的是什么 |
+|---|---|---|
+| 游戏 | `!terminal` `!ssh` `!aws local` `!x86 pc` `!cpu emulator` | 终端/AWS/主机模拟器 → 47/140 误判 |
+| 游戏 | `!game engine` `!game framework` `!game server` `!game backend` `!game development` | 引擎/框架属「游戏开发」 |
+| 游戏 | `!color scheme` `!theme` | retro 是设计圈常用词（gruvbox 等） |
+| 加速工具 | `!mirror of` `!source code mirror` `!read-only mirror` `!official mirror` `!github mirror` `!git-ified` `!mirror repository` | `mirror` 英文首要含义是代码镜像仓库，误收 22 个（FFmpeg/git/postgres/chromium/CMake） |
+| 视频工具 | `!manga` `!comic` `!torrent` `!漫画` `!小说` `!novel` | `downloader` 太泛，误收 17 个漫画/小说下载器 |
+| 阅读 | `!股票` `!stock` `!舆情` `!trend monitor` | `新闻` 会被股票分析/舆情监控命中 |
+| 影视 | `!animation engine` `!动画引擎` | `anime` 词形变体命中 `animation` |
+| 创作 | `!algorithm` `!数据结构` | 中文子串 `动画` 命中「动画图解算法」（hello-algo） |
+
+**负词必须够精确**——实测踩过：`!x86` 误杀 "PlayStation 1 emulator for **x86**-64"、
+`!shell` 误杀 "**Shell** script to set up RetroPie"、`!aws` 误杀 "**Amazon** Games
+launcher"、`!design system` 误杀 "coordination system"、裸词 `gaming` 抢走 70 个
+游戏开发项目。只用不会与目标项目共现的词组。
+
+**存量数据修复**：改词表不会自动改库（主分类一经入库就固定）。三个一次性脚本，
+一律先 dry-run 再 `--apply`：
+
+| 脚本 | 作用 |
+|---|---|
+| `fix_game_misclassification.py` | 「游戏」分类内按描述特征改归（终端→开发/配色→设计） |
+| `clean_stale_secondary.py` | 全库摘除失去证据的**附加分类**（内置分类；自定义分类跳过） |
+| `fix_category_drift.py` | 五类词表漂移的存量迁移（代码镜像→开发、漫画下载→阅读 等） |
+
+**修复心法**：宁可留着看不顺眼，也不要乱迁。试过「迁到首个命中分类」，结果
+streamlink/owncast/mediapipe 四个影视工具被判进「开发」——因为「开发」收了
+cli/framework/awesome 这类通用词，全库 28% 都能命中它。所以只做「描述明确说明
+它是什么」的特征路由，给不出归属的一律不动。
+
+**证据支持率不是准确率**：全库约 21% 项目主分类零关键词证据，但归属是对的
+（如效率工具里的 n8n、uv、brew 都是真实效率/开发工具，只是词表没覆盖）。别拿
+「零命中 = 错分类」去清库。
 
 ## 平台选型调研结论（2026-11 实测，避免重复踩坑）
 
