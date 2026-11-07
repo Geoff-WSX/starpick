@@ -646,7 +646,7 @@ function back() {
           <template v-else-if="detail.assets.length === 0">{{ t('detail_no_pkg_q') }}</template>
           {{ t('detail_prompt_desc') }}
         </p>
-        <p v-if="matchedAssets.length" class="actions-hint">{{ matchedAssets[0].name }}（{{ formatSize(matchedAssets[0].size) }}） · 点击下方列表文件名也可直接下载</p>
+        <p v-if="matchedAssets.length" class="actions-hint">{{ t('detail_asset_match').replace('{name}', matchedAssets[0].name).replace('{size}', formatSize(matchedAssets[0].size)) }}</p>
 
         <!-- 全部版本列表 -->
         <div v-if="detail.assets.length > 0" class="asset-list">
@@ -720,8 +720,8 @@ function back() {
         <div v-if="extraLoading" class="variant-hint">{{ t('detail_variant_fetching').replace('{label}', extraLoading) }}</div>
         <div v-else-if="extraError" class="variant-hint error">
           {{ extraError }}
-          <button class="btn small" :disabled="!!extraLoading" @click="retryExtraVariant">重试</button>
-          <a v-if="extraFallbackUrl" :href="extraFallbackUrl" target="_blank" rel="noopener" @click.prevent="openExternal(extraFallbackUrl)">在 GitHub 打开</a>
+          <button class="btn small" :disabled="!!extraLoading" @click="retryExtraVariant">{{ t('detail_variant_retry') }}</button>
+          <a v-if="extraFallbackUrl" :href="extraFallbackUrl" target="_blank" rel="noopener" @click.prevent="openExternal(extraFallbackUrl)">{{ t('detail_variant_github') }}</a>
         </div>
         <div v-if="readmeHtml" class="markdown-body" v-html="readmeHtml" @click="onReadmeClick"></div>
         <div v-else-if="readmeLang === 'zh'" class="empty">{{ t('detail_no_zh_readme') }}</div>

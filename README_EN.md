@@ -118,7 +118,7 @@ All in `backend/config.yaml` (restart to apply; invalid config refuses startup):
 | `server` | `host` / `port` | Localhost default 127.0.0.1:8000 |
 | `schedule` | `discovery_created_hours` / `timezone` | Discovery look-back window and timezone (collection is manual only) |
 | `github` | `token_env` / `search_rate_per_minute` / `request_timeout` / `retry_max` / `mirror_enabled` / `mirror_prefixes` | Quotas, timeouts, retries, mirror list |
-| `filter` | `min_stars`(200) / `max_inactive_days`(90) / `zh_weight` / `require_zh` | Filter thresholds |
+| `filter` | `min_stars`(200) / `max_inactive_days`(90) / `zh_weight` | Filter thresholds (`require_zh` removed 2026-11: it never took effect — Chinese-friendliness is weighting only) |
 | `dedup` | `re_recommend_on_major_update` / `rounds_retention` | Dedup & re-recommendation |
 | `categories` | category name → keyword list | Define search scope, freely editable |
 

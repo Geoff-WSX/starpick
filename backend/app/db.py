@@ -1353,14 +1353,36 @@ class Database:
             return cur.rowcount
 
     # ---------------- daily_picks（每日精选） ----------------
-    def list_pickable(self, min_stars: int = 20) -> list[dict]:
-        """每日精选候选池：id/category/stars/pushed_at/zh_friendly/has_update。"""
+    def list_pickable(self, min_stars: int = 20,
+                      exclude_picked_since: str = "") -> list[dict]:
+        """每日精选候选池：id/category/stars/pushed_at/zh_friendly/has_update。
+
+        `exclude_picked_since`（YYYY-MM-DD）非空时，排除该日期之后已被精选过的
+        项目。没有这个排除，候选池固定 + 评分固定 = 每天精算出同一批 Top 5
+        （实测连续三天完全相同）。留空 = 不排除（老行为，测试与「换一批」用）。
+        """
+        sql = ("SELECT id, category, stars, pushed_at, zh_friendly, has_update "
+               "FROM projects WHERE stars >= ?")
+        params: list = [min_stars]
+        if exclude_picked_since:
+            sql += (" AND id NOT IN (SELECT project_id FROM daily_picks "
+                    "WHERE pick_date >= ?)")
+            params.append(exclude_picked_since)
         with self._lock:
-            rows = self._conn.execute(
-                "SELECT id, category, stars, pushed_at, zh_friendly, has_update "
-                "FROM projects WHERE stars >= ?", (min_stars,),
-            ).fetchall()
+            rows = self._conn.execute(sql, params).fetchall()
             return [dict(r) for r in rows]
+
+    def pickable_count(self, min_stars: int = 20,
+                       exclude_picked_since: str = "") -> int:
+        """候选池剩余数量（精选池用光前的兜底判断：不够就重置窗口）。"""
+        with self._lock:
+            sql = "SELECT COUNT(*) AS c FROM projects WHERE stars >= ?"
+            params: list = [min_stars]
+            if exclude_picked_since:
+                sql += (" AND id NOT IN (SELECT project_id FROM daily_picks "
+                        "WHERE pick_date >= ?)")
+                params.append(exclude_picked_since)
+            return int(self._conn.execute(sql, params).fetchone()["c"])
 
     def pick_shuffle(self, count: int = 15) -> list[dict]:
         """「换一批」候选：随机抽取（多取一些供分类去重），含列表展示字段。"""

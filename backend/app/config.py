@@ -153,12 +153,16 @@ class Config:
     )
     per_category_top: int = 5
     concurrency: int = 6
-    update_batch_size: int = 30    # 每轮增量检查的项目数（最久未检查优先，滚动轮询）
+    # update_batch_size 已于 2026-11 删除：它是「定时增量检查每轮 N 条」的参数，
+    # 但定时更新检查早已废弃（2026-10-24 起全手动、limit=None 检查全库）。
+    # 留着这个键只会让人以为改了有效果。旧 config.yaml 里残留的同名键被忽略。
 
     min_stars: int = 500
     max_inactive_days: int = 90
     zh_weight: float = 1.2
-    require_zh: bool = False
+    # require_zh 已于 2026-11 删除：它从未被任何筛选/入库逻辑消费。
+    # 「中文友好」始终只做排序加权（见 zh_weight），require_zh=true 无任何效果。
+    # 旧 config.yaml 里残留的同名键被忽略。
 
     # ---- 多平台来源（2026-11 起） ----
     # 各平台星数量级差异极大：Codeberg 全站最高约 7k，绝大多数项目 < 500 星，
@@ -268,14 +272,12 @@ def load_config(path: Path | str | None = None) -> Config:
         cfg.mirror_prefixes = []
     cfg.per_category_top = int(gh.get("per_category_top", cfg.per_category_top))
     cfg.concurrency = int(gh.get("concurrency", cfg.concurrency))
-    cfg.update_batch_size = int(gh.get("update_batch_size", cfg.update_batch_size))
 
     # filter
     flt = raw.get("filter", {}) if isinstance(raw.get("filter", {}), dict) else {}
     cfg.min_stars = int(flt.get("min_stars", cfg.min_stars))
     cfg.max_inactive_days = int(flt.get("max_inactive_days", cfg.max_inactive_days))
     cfg.zh_weight = float(flt.get("zh_weight", cfg.zh_weight))
-    cfg.require_zh = bool(flt.get("require_zh", cfg.require_zh))
 
     # dedup
     dd = raw.get("dedup", {}) if isinstance(raw.get("dedup", {}), dict) else {}
@@ -327,8 +329,6 @@ def validate(cfg: Config) -> None:
         errors.append(f"server.port: {cfg.port} 超出合法端口范围 (1-65535)")
     if cfg.discovery_created_hours < 1 or cfg.discovery_created_hours > 720:
         errors.append("schedule.discovery_created_hours: 必须在 1-720 之间")
-    if cfg.update_batch_size < 1:
-        errors.append("github.update_batch_size: 必须 >= 1")
     if cfg.min_stars < 0:
         errors.append("filter.min_stars: 必须 >= 0")
     if cfg.max_inactive_days < 1:

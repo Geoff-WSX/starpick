@@ -177,3 +177,32 @@ def test_prune_keeps_update_notifications(fclient):
     # update 一条不丢，collect 被裁到配额内
     assert counts.get("update") == 5
     assert counts.get("collect", 0) <= 400
+
+
+def test_daily_picks_vary_across_days(fclient):
+    """每日精选必须逐日变化（2026-11 修复的回归测试）。
+
+    背景：`list_pickable` 不排除已精选项目，候选池固定 + 评分固定 → 每天
+    算出同一批 Top 5（实测 2026-11-07/08/09 三天完全相同，库里 11-04 与
+    11-05 也完全相同）。修复：候选池排除最近 N 天已精选过的项目。
+    """
+    from app.picker import pick_daily
+
+    db = fclient[1]
+    # 造 40 个热度各异、分类分散的项目 —— 够两天各出 5 个不重叠
+    cats = ["影视", "开发", "AI工具", "音乐", "阅读"]
+    for i in range(40):
+        _seed(db, full_name=f"org/pick-{i:02d}", stars=10000 - i * 200,
+              cat=cats[i % len(cats)])
+
+    day1 = pick_daily(db, pick_date="2026-11-01")
+    db.save_daily_pick("2026-11-01", day1)
+    day2 = pick_daily(db, pick_date="2026-11-02")
+    db.save_daily_pick("2026-11-02", day2)
+
+    ids1 = {p["project_id"] for p in day1}
+    ids2 = {p["project_id"] for p in day2}
+    assert ids1 and ids2, "两天的榜单都不应为空"
+    assert ids1.isdisjoint(ids2), (
+        f"第二天与第一天重复：{sorted(ids1 & ids2)} —— 候选池未排除已精选项目"
+    )

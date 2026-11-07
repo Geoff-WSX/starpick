@@ -3,11 +3,18 @@
 - 模式B（热度加权）：stars + 活跃度 + 中文友好加权
 
 组合规则：先取模式A前 N/2，再用模式B补足；同分类最多 2 个（分类多样性）。
+
+**去重窗口**（2026-11 修复）：候选池排除「最近 N 天已精选过」的项目，
+否则候选池固定 + 评分固定 = 每天算出同一批 Top 5（实测连续三天完全相同）。
+窗口逐级回退（30 天 → 14 天 → 7 天 → 不排除），保证池子小的时候仍能出榜。
 """
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 log = logging.getLogger(__name__)
+
+# 去重窗口（天）。按顺序尝试，第一个「剩余候选 >= count * 3」的窗口胜出。
+_EXCLUDE_WINDOWS = (30, 14, 7, 0)
 
 
 def _hot_score(project) -> float:
@@ -24,6 +31,20 @@ def _hot_score(project) -> float:
     return round(base * freshness + zh, 4)
 
 
+def _pick_candidates(db, pick_date: str, count: int) -> list[dict]:
+    """按去重窗口取候选池：窗口越窄池子越大，取第一个够用的。"""
+    for days in _EXCLUDE_WINDOWS:
+        if days <= 0:
+            return db.list_pickable(min_stars=20)
+        since = (datetime.strptime(pick_date, "%Y-%m-%d")
+                 - timedelta(days=days)).strftime("%Y-%m-%d")
+        remaining = db.pickable_count(min_stars=20, exclude_picked_since=since)
+        if remaining >= count * 3:
+            return db.list_pickable(min_stars=20, exclude_picked_since=since)
+    # 所有窗口都不够（池子极小）：退回不排除，至少能出榜
+    return db.list_pickable(min_stars=20)
+
+
 def pick_daily(db, pick_date: str | None = None, count: int = 5) -> list[dict]:
     """生成每日精选。返回 [{'project_id','score'}, ...]（已按 rank 排序）。
     pick_date 默认今天（UTC 日期）。count 钳制 3~20。
@@ -34,8 +55,8 @@ def pick_daily(db, pick_date: str | None = None, count: int = 5) -> list[dict]:
         count = 20
     date_str = pick_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    # 候选池：有一定热度的项目（避免收录僵尸仓库）
-    cands = db.list_pickable(min_stars=20)
+    # 候选池：有一定热度的项目（避免收录僵尸仓库），并排除近期已精选的
+    cands = _pick_candidates(db, date_str, count)
     if not cands:
         return []
     for c in cands:

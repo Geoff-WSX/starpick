@@ -121,7 +121,7 @@ README、图片、下载直链自动走国内镜像加速（gh-proxy.com / ghpro
 | `server` | `host` / `port` | 仅本机访问默认 127.0.0.1:8000 |
 | `schedule` | `discovery_created_hours` / `timezone` | 发现轮回看窗口与时区（采集均为手动触发） |
 | `github` | `token_env` / `search_rate_per_minute` / `request_timeout` / `retry_max` / `mirror_enabled` / `mirror_prefixes` | 配额、超时、重试、镜像列表 |
-| `filter` | `min_stars`(200) / `max_inactive_days`(90) / `zh_weight` / `require_zh` | 筛选阈值 |
+| `filter` | `min_stars`(200) / `max_inactive_days`(90) / `zh_weight` | 筛选阈值（`require_zh` 已于 2026-11 删除：从未生效，「中文友好」始终只做加权） |
 | `dedup` | `re_recommend_on_major_update` / `rounds_retention` | 去重与再推荐策略 |
 | `categories` | 分类名 → 关键词列表 | 决定搜索范围，可自由增删 |
 
