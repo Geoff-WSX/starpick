@@ -252,6 +252,9 @@ cli/framework/awesome 这类通用词，全库 28% 都能命中它。所以只�
 - **改前端后忘记 build**：`start.sh` 只在 `dist/index.html` 缺失时才构建；已构建过则改源码后必须手动 `npm run build`（或用 dev 模式调试）。
 - **端口 8000 已占用**：`start.sh` 检测到会直接打开浏览器而不重复启动；重启服务先 `pkill -f 'uvicorn app.main:app'`。
 - GitHub raw 直连常被重置：README/图片/下载链接走镜像 failover（gh-proxy.com → ghproxy.net → 直连/API 兜底），镜像前缀列表在 config.yaml `github.mirror_prefixes`，不要硬编码。
+- **`.app.tar.gz` 是 macOS 包，不是 Linux**：Tauri/Electron 的 macOS 应用发 `Clash.Verge_x.y.z_aarch64.app.tar.gz` 作自动更新包。`_ASSET_PLATFORMS` 里这条规则**必须排在 `.tar.gz` 之前**，否则会被判成 Linux——实测 8 个项目因此错标（EcoPaste/tiez-clipboard/autoclip 等纯 macOS 软件出现在「Linux」筛选下）。`tests/test_requirements.py::test_infer_platforms_app_targz_is_macos` 锁定此行为。
+- **「按资产推断平台」和「按 README 兜底」不能混用于批量回填**：README 兜底会把 JS 库（shaka-player/blockly）因正文提到 "Linux" 判成 Linux，比现状更错。历史 `platforms` 与重算结果有 65 处分歧，其中只有 8 处是 `.app.tar.gz` 修复造成的；**只回填自己改动负责的那部分**，其余留原样。
+- **通知裁剪必须按类型分配额，不能全局按 id 截断**：采集一轮写几百条 `collect` 通知，全局保留最近 500 条会把 `update`（有新版）通知整批挤掉——实测库里 500 条全是 collect、update 为 0，同时有 454 个项目标记了 `has_update=1`。`prune_notifications(keep=400, keep_update=200)` 按 type 各自保留；回归测试在 `test_notifications.py::test_prune_keeps_update_notifications`。
 - 采集有防重入原子锁 + 启动时自动清理遗留 running 轮次；调试采集卡死先看 `logs/kazumi.log`（单行 JSON 结构化日志，5MB×5 轮转）和 `backend/uvicorn.log`。
 - **笔记本休眠会让后台任务延迟**（2026-10-24 起仅剩数据库备份/应用自更新两个定时任务，采集已全手动）：macOS 休眠时 `time.monotonic()` 冻结，APScheduler 的等待线程据此计时，睡眠期间连维护性 DarkWake 也不检查任务。`_run_sleep_watchdog`（挂钟/单调钟差值判休眠）+ 剩余任务 `misfire_grace_time=None`（唤醒后 coalesce 补跑一次）兜底，改动前先读 `backend/tests/test_scheduler.py`。
 - 历史上的定时采集轮次（discovery/full/full-startup 等 source）仍存在于 rounds 表与采集历史弹窗里，`RoundsModal` 的来源标签是给旧数据渲染的，不要删。

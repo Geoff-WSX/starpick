@@ -80,3 +80,17 @@ def test_major_version_of():
     assert major_version_of("v2.3.8") == "2"
     assert major_version_of("1.0") == "1"
     assert major_version_of("") == ""
+
+
+def test_infer_platforms_app_targz_is_macos():
+    """Tauri/Electron 的 `.app.tar.gz` 是 macOS 自动更新包，不能判成 Linux。
+
+    实测 24 个含此类资产的项目里 11 个被错标为 Linux（clash-verge-rev、
+    readest、nuclear 等纯 macOS 软件出现在「Linux」筛选下）。
+    """
+    assert infer_platforms(["Clash.Verge_2.5.8_aarch64.app.tar.gz"]) == ["macOS"]
+    assert infer_platforms(["Yaagl.app.tar.gz"]) == ["macOS"]
+    # 真正的 Linux 压缩包仍然判 Linux
+    assert infer_platforms(["tool-1.0-linux-x64.tar.gz"]) == ["Linux"]
+    # 常规 tar.gz 不受影响
+    assert infer_platforms(["source-1.0.tar.gz"]) == ["Linux"]

@@ -150,3 +150,30 @@ def test_picks_api(fclient):
     assert body["pick_date"] == "2026-10-13"
     assert len(body["items"]) == 3
     assert body["items"][0]["rank"] == 1
+
+
+def test_prune_keeps_update_notifications(fclient):
+    """按类型裁剪：采集通知不能把更新通知挤掉（2026-11 修复的回归测试）。
+
+    背景：原实现按 id 倒序全局保留最近 500 条，采集一轮写几百条 collect
+    就把 update 全挤掉（实测库里 500 条全是 collect，update 为 0，同时
+    有 454 个项目标记了 has_update=1）。
+    """
+    _, db = fclient
+    # 先写 5 条 update（id 最小 = 最老），再写 600 条 collect
+    for i in range(5):
+        db.create_notification("update", 0, f"有新版 update-{i}", "body")
+    for i in range(600):
+        db.create_notification("collect", 0, f"新项目 collect-{i}", "")
+
+    db.prune_notifications()
+
+    counts = {
+        r["type"]: r["n"]
+        for r in db._conn.execute(
+            "SELECT type, COUNT(*) n FROM notifications GROUP BY type"
+        )
+    }
+    # update 一条不丢，collect 被裁到配额内
+    assert counts.get("update") == 5
+    assert counts.get("collect", 0) <= 400

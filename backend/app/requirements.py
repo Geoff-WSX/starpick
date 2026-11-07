@@ -11,9 +11,18 @@ from __future__ import annotations
 import re
 
 # 资产扩展名 → 平台（按优先级排列，识别到的第一个命中的平台）
+#
+# ⚠ `.app.tar.gz` 必须排在 `.tar.gz` 之前：Tauri/Electron 的 macOS 应用会产出
+# `Clash.Verge_2.5.8_aarch64.app.tar.gz` 作为自动更新包。若先匹配 `.tar.gz`
+# 会被判成 Linux——实测 24 个含此类资产的项目里 11 个被错标（clash-verge-rev、
+# readest、nuclear 等纯 macOS 软件出现在「Linux」筛选下）。
+#
+# `.zip` 归 Windows 是有意为之（便携版 exe 打包最常见），但 macOS/Linux 也有
+# .zip 发行版，这是既有取舍，改它会波及大量存量标注，暂不动。
 _ASSET_PLATFORMS: list[tuple[str, str]] = [
     (r"\.(exe|msi|msix|zip)$", "Windows"),
     (r"\.dmg$|\.pkg$", "macOS"),
+    (r"\.app\.tar\.gz$", "macOS"),      # Tauri/Electron macOS 自动更新包（须在 tar.gz 之前）
     (r"\.(apk|aab)$", "Android"),
     (r"\.ipa$", "iOS"),
     (r"\.(deb|rpm|AppImage|tar\.gz|tgz)$", "Linux"),

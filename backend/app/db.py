@@ -541,18 +541,44 @@ class Database:
             self._conn.commit()
             return cur.rowcount
 
-    def prune_notifications(self, keep: int = 500) -> int:
-        """仅保留最近 N 条通知（防表无限增长）。"""
+    def prune_notifications(self, keep: int = 400, keep_update: int = 200) -> int:
+        """按**类型**分别保留通知（防表无限增长，同时避免采集通知挤掉更新通知）。
+
+        背景：原实现按 id 倒序全局保留最近 N 条。采集一轮会写几百条「新项目收录」
+        （type=collect），而「有新版」（type=update）要等一次更新检查才产生一条
+        ——全局裁剪的结果是 update 通知被整批挤掉（实测 500 条全是 collect，
+        update 为 0，而库里有 454 个项目标记了 has_update=1）。改为每个 type
+        各自留配额，两类信息互不影响。
+        """
         if keep < 1:
-            keep = 500
+            keep = 400
+        if keep_update < 1:
+            keep_update = 200
+        caps = {"update": keep_update}
+        deleted = 0
         with self._lock:
-            cur = self._conn.execute(
-                "DELETE FROM notifications WHERE id NOT IN "
-                "(SELECT id FROM notifications ORDER BY id DESC LIMIT ?)",
-                (keep,),
-            )
+            types = [
+                r["type"] for r in self._conn.execute(
+                    "SELECT DISTINCT type FROM notifications WHERE type IS NOT NULL"
+                )
+            ]
+            for ntype in types:
+                limit = caps.get(ntype, keep)
+                rows = self._conn.execute(
+                    "SELECT id FROM notifications WHERE type=? "
+                    "ORDER BY id DESC LIMIT -1 OFFSET ?",
+                    (ntype, limit),
+                ).fetchall()
+                if not rows:
+                    continue
+                ids = [r["id"] for r in rows]
+                placeholders = ",".join("?" * len(ids))
+                cur = self._conn.execute(
+                    f"DELETE FROM notifications WHERE id IN ({placeholders})", ids
+                )
+                deleted += cur.rowcount
             self._conn.commit()
-            return cur.rowcount
+            return deleted
 
     # ---------------- projects ----------------
     @staticmethod
