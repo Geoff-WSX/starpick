@@ -11,7 +11,7 @@
 
 **Browse GitHub like an app store.** STARPICK discovers, filters, translates, and annotates open-source projects for you — you just hit "Download".
 
-<img src="docs/截图-首页深色.png" alt="STARPICK home: 12 categories of high-star open-source projects with category/platform/language filters" width="100%">
+<img src="docs/demo.gif" alt="STARPICK demo: home listing → in-site README → collection progress → settings" width="100%">
 
 <p align="center">
   <a href="https://github.com/Geoff-WSX/starpick/releases/latest"><b>⬇️ Download for Windows / macOS</b></a>

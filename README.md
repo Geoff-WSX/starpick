@@ -11,7 +11,7 @@
 
 **像刷应用商店一样逛 GitHub。** STARPICK 自动发现、筛选、翻译、标注开源项目——你只需要点「下载」。
 
-<img src="docs/截图-首页深色.png" alt="STARPICK 首页：12 大类高星开源项目榜单，可按分类/平台/语言筛选" width="100%">
+<img src="docs/demo.gif" alt="STARPICK 演示：首页榜单 → 详情页 README → 采集进度 → 设置" width="100%">
 
 <p align="center">
   <a href="https://github.com/Geoff-WSX/starpick/releases/latest"><b>⬇️ 下载 Windows / macOS 安装包</b></a>
