@@ -1,10 +1,33 @@
 # STARPICK
 
-> **English** | **简体中文** — [English README](README_EN.md)
+**[简体中文](README.md) | [English](README_EN.md)**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](backend/requirements.txt)
+[![Vue 3](https://img.shields.io/badge/Vue-3-4FC08D?logo=vue.js&logoColor=white)](frontend)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](backend)
+[![Platform](https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux-下载即用-2ea44f)](#桌面版安装包推荐)
+[![Stars](https://img.shields.io/github/stars/Geoff-WSX/starpick?style=social)](https://github.com/Geoff-WSX/starpick/stargazers)
+
+**像刷应用商店一样逛 GitHub。** STARPICK 自动发现、筛选、翻译、标注开源项目——你只需要点「下载」。
+
+<img src="docs/截图-首页深色.png" alt="STARPICK 首页：12 大类高星开源项目榜单，可按分类/平台/语言筛选" width="100%">
+
+<p align="center">
+  <a href="https://github.com/Geoff-WSX/starpick/releases/latest"><b>⬇️ 下载 Windows / macOS 安装包</b></a>
+  ·
+  <a href="#快速开始macos--linux-源码运行">源码运行</a>
+  ·
+  <a href="docs/截图-详情页.png">看详情页截图</a>
+</p>
+
+---
 
 GitHub 上有几十万个免费开源的好工具，但英语界面、命令行、真假难辨的质量，把大多数人挡在了门外。**STARPICK 替你逛 GitHub**——自动发现、筛选、翻译、标注，你像刷应用商店一样点开就能用。
 
-一个**开源项目发现与推荐工具**：按分类、平台、语言筛选 GitHub 高星开源项目，自动标注中文友好度、系统要求与下载方式，支持国内镜像加速与一键安装引导。面向中文用户的开源工具库、GitHub 项目导航、开源软件推荐清单。
+一个**开源项目发现与推荐工具**：按分类、平台、语言筛选 GitHub / Codeberg 高星开源项目，自动标注中文友好度、系统要求与下载方式，支持国内镜像加速与一键安装引导。面向中文用户的开源工具库、GitHub 项目导航、开源软件推荐清单。
+
+索引 **2000+ 个已入库项目**（约 590 个中文友好，87 个项目带多语言 README 共 375 个语言版本），由 **212 个中英关键词 + 34 个排除词**在 12 个分类下持续召回。
 
 > **想直接用？** 去 [GitHub Releases 下载安装包](https://github.com/Geoff-WSX/starpick/releases/latest)（Windows / macOS 双平台，双击安装即可）。
 
@@ -77,7 +100,7 @@ README、图片、下载直链自动走国内镜像加速（gh-proxy.com / ghpro
   - Windows：SmartScreen 点「更多信息 → 仍要运行」
 - **GITHUB_TOKEN**：设置里填入即热生效（存数据目录，不落盘、不入库）。未配置时限流较严（一轮采集 15-30 分钟），配置后约 3-5 分钟
 
-## 快速开始（macOS 开发模式）
+## 快速开始（macOS / Linux 源码运行）
 
 ```bash
 ./start.sh   # 自动建 venv、装依赖、构建前端、启动并打开浏览器
@@ -85,7 +108,9 @@ README、图片、下载直链自动走国内镜像加速（gh-proxy.com / ghpro
 
 手动启动：`backend` 装依赖 → `frontend` 构建 → `python -m uvicorn app.main:app`，访问 http://127.0.0.1:8000。
 
-> 本仓库为 macOS 分支（与 Windows 旧电脑上的分支独立演进，基线见 FORK.md）。
+**环境要求**：Python 3.10+、Node.js 18+。已实测 macOS 13+ / Linux（Ubuntu 22.04）。
+
+> 本仓库为 macOS 分支（与 Windows 旧电脑上的分支独立演进，基线见 [FORK.md](FORK.md)）。Windows 用户请直接用[安装包](#桌面版安装包推荐)。
 
 ## 配置
 
@@ -193,4 +218,6 @@ cd frontend && npm run dev   # http://localhost:5173
 
 ## License
 
-MIT
+[MIT](LICENSE) © 2026 Geoff-WSX
+
+你可以自由使用、修改、分发本项目（含商业用途），保留版权声明即可。

@@ -1,8 +1,33 @@
 # STARPICK
 
+**[简体中文](README.md) | [English](README_EN.md)**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](backend/requirements.txt)
+[![Vue 3](https://img.shields.io/badge/Vue-3-4FC08D?logo=vue.js&logoColor=white)](frontend)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](backend)
+[![Platform](https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux-Install%20and%20run-2ea44f)](#desktop-installers-recommended)
+[![Stars](https://img.shields.io/github/stars/Geoff-WSX/starpick?style=social)](https://github.com/Geoff-WSX/starpick/stargazers)
+
+**Browse GitHub like an app store.** STARPICK discovers, filters, translates, and annotates open-source projects for you — you just hit "Download".
+
+<img src="docs/截图-首页深色.png" alt="STARPICK home: 12 categories of high-star open-source projects with category/platform/language filters" width="100%">
+
+<p align="center">
+  <a href="https://github.com/Geoff-WSX/starpick/releases/latest"><b>⬇️ Download for Windows / macOS</b></a>
+  ·
+  <a href="#quick-start-macos--linux-from-source">Run from source</a>
+  ·
+  <a href="docs/截图-详情页.png">See the detail page</a>
+</p>
+
+---
+
 GitHub is home to hundreds of thousands of great open-source tools, but English UIs, command-line workflows, and uncertain quality keep most people away. **STARPICK browses GitHub for you** — automatically discovering, filtering, translating, and annotating projects, so you can use them like an app store.
 
-An **open-source project discovery and recommendation tool**: browse high-star GitHub projects by category, platform, and language, with automatic Chinese-friendliness ratings, system requirements, and download guidance. Mirror acceleration and one-click install guidance included. A GitHub project directory and open-source software curation list for Chinese-speaking users.
+An **open-source project discovery and recommendation tool**: browse high-star GitHub / Codeberg projects by category, platform, and language, with automatic Chinese-friendliness ratings, system requirements, and download guidance. Mirror acceleration and one-click install guidance included. A GitHub project directory and open-source software curation list for Chinese-speaking users.
+
+Indexes **2000+ curated projects** (~590 rated Chinese-friendly; 87 projects carry multilingual READMEs across 375 language variants), recalled continuously by **212 keywords + 34 exclusion terms** across 12 categories.
 
 > **Just want to use it?** Grab the installer from [GitHub Releases](https://github.com/Geoff-WSX/starpick/releases/latest) (Windows / macOS, double-click to install).
 
@@ -72,7 +97,7 @@ In one sentence: **you don't need to know GitHub — you only need to know the "
   - Windows: SmartScreen → "More info" → "Run anyway"
 - **GITHUB_TOKEN**: paste in Settings for hot activation (stored in data dir, never written to disk config or DB). Without a token, rate limits are strict (a full round takes 15–30 min); with one, about 3–5 min.
 
-## Quick start (macOS dev mode)
+## Quick start (macOS / Linux from source)
 
 ```bash
 ./start.sh   # creates venv, installs deps, builds frontend, starts and opens browser
@@ -80,7 +105,9 @@ In one sentence: **you don't need to know GitHub — you only need to know the "
 
 Manual: install backend deps → build frontend → `python -m uvicorn app.main:app`, visit http://127.0.0.1:8000.
 
-> This repo is the macOS branch (the Windows branch on the old machine evolves independently, see FORK.md).
+**Requirements**: Python 3.10+, Node.js 18+. Tested on macOS 13+ and Linux (Ubuntu 22.04).
+
+> This repo is the macOS branch (the Windows branch on the old machine evolves independently, see [FORK.md](FORK.md)). Windows users should use the [installer](#desktop-installers-recommended) instead.
 
 ## Configuration
 
@@ -191,4 +218,6 @@ cd frontend && npm run dev   # http://localhost:5173
 
 ## License
 
-MIT
+[MIT](LICENSE) © 2026 Geoff-WSX
+
+Free to use, modify, and distribute, including commercially — just keep the copyright notice.
