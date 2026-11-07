@@ -59,6 +59,10 @@ export default {
   // Daily picks
   daily_pick: 'Daily Picks',
   shuffle: 'Shuffle',
+  pick_today: 'Today',
+  pick_days_ago: '{n} days ago',
+  pick_shuffled: 'Random batch',
+  pick_new_ver: 'New release',
 
   // Card
   card_copy_prompt: 'Copy install prompt',

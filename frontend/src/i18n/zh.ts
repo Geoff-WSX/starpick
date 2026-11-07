@@ -59,6 +59,10 @@ export default {
   // 每日精选
   daily_pick: '每日精选',
   shuffle: '换一批',
+  pick_today: '今日',
+  pick_days_ago: '{n} 天前',
+  pick_shuffled: '随机一批',
+  pick_new_ver: '有新版本',
 
   // 卡片
   card_copy_prompt: '复制安装提示词',

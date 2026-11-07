@@ -977,8 +977,11 @@ a:hover {
   background: var(--bg-tint);
 }
 
-/* star 数字：等宽 + 橙红（杂志大数字） */
-.fav-star {
+/* 收藏按钮（列表卡片 + 每日精选共用同一套）：**书签**图标，不用星星。
+   原因：两处都紧挨着 `★ 399.2k` 星数，并排两个星星会让用户分不清哪个可点、
+   且收藏态与星数在视觉上完全重复。书签形状不同、语义也更贴切。
+   列表卡片用默认尺寸（28px 圆形点击区），精选条空间窄用 `.bare` 小一号去边框版本。 */
+.fav-btn {
   flex: none;
   width: 28px;
   height: 28px;
@@ -990,23 +993,43 @@ a:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  padding: 0;
+  transition: border-color 0.15s, color 0.15s, background 0.15s, transform 0.1s;
 }
-.fav-star:hover {
+.fav-btn:hover:not(:disabled) {
   border-color: var(--accent);
   color: var(--accent-deep);
 }
-.fav-star.on {
+.fav-btn.on {
   color: var(--accent);
   border-color: var(--accent);
   background: var(--accent-weak);
 }
-.fav-star.on .fav-star-svg {
-  fill: currentColor;
+.fav-btn.on .fav-btn-svg {
+  fill: currentColor;          /* 已收藏：实心书签 */
 }
-.fav-star-svg {
+.fav-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.fav-btn-svg {
   width: 14px;
   height: 14px;
+}
+/* 精选条里的紧凑版：去掉圆形边框，只留图标（不影响点击区高度基准） */
+.fav-btn.bare {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  background: transparent;
+}
+.fav-btn.bare:hover:not(:disabled) {
+  color: var(--accent);
+  transform: scale(1.15);
+}
+.fav-btn.bare .fav-btn-svg {
+  width: 13px;
+  height: 13px;
 }
 
 .stars {
@@ -2618,61 +2641,105 @@ a:hover {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
 }
+/* 精选卡：三行结构（排名+星数 / 名称 / 分类+作者）。
+   原实现是单行 flex，名称被类别标签和星数挤到只剩十几个字符
+   （tensorflow 显示成 "tensor…"），且丢掉了后端已返回的 owner 字段。 */
 .pick-card {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: -4px 0;                 /* 补偿上方 gap，卡片视觉更紧凑 */
+  flex-direction: column;
+  gap: 5px;
   min-width: 0;
+  padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-card);
   text-decoration: none;
   color: inherit;
   font-size: 12px;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, background 0.2s;
 }
 .pick-card:hover {
   border-color: var(--accent);
+  background: var(--bg-hover);
+}
+/* 第一行：排名 · 新版徽标 · 收藏 · 星数 */
+.pick-card .pick-top {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
 }
 .pick-card .pick-rank {
   color: var(--accent-deep);
   font-weight: 700;
   font-size: 11px;
   flex: none;
-  padding: 4px 0 4px 4px;
 }
+.pick-card .pick-new {
+  flex: none;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ok);
+  /* 用 ok 色小箭头表示「有新版本」，不额外占标签位 */
+}
+/* 精选条的收藏按钮复用全局 `.fav-btn.bare`（定义在列表卡片样式旁）——
+   两处用同一个组件类，避免图标/状态样式各写一套导致视觉不一致。 */
+.pick-card .pick-fav {
+  margin: 0 0 0 auto;
+}
+.pick-card .pick-stars {
+  flex: none;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+/* 第二行：项目名（独占整行，可截断但悬停可见全名） */
 .pick-card .pick-name {
   font-weight: 600;
+  font-size: 13px;
   min-width: 0;
-  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.25;
 }
-.pick-card .tag {
-  font-size: 11px;
-  padding: 1px 5px;
-  flex: none;
+/* 第三行：分类彩标 + 作者 */
+.pick-card .pick-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
 }
-.pick-card .stars {
-  font-size: 11px;
-  padding: 4px 4px 4px 0;
+.pick-card .pick-cat {
   flex: none;
+  font-size: 10px;
+  padding: 0 5px;
+  border: 1px solid;
+  border-radius: var(--radius);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.pick-card .pick-owner {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--text-dim);
 }
 /* 每日精选网格：窄屏自适应列数 */
 @media (max-width: 900px) {
   .picks-list {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  /* 窄屏隐藏标签：确保排名+名称+星数完整显示 */
-  .pick-card .tag {
-    display: none;
-  }
 }
 @media (max-width: 640px) {
   .picks-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* 极窄屏：作者名太长，优先保住项目名与分类 */
+  .pick-card .pick-owner {
+    display: none;
   }
 }
 

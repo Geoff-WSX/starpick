@@ -3,12 +3,15 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ProjectCard from '../components/ProjectCard.vue'
 import {
+  addFavorite,
   fetchDailyPick,
   fetchShufflePick,
   fetchCategories,
   fetchProjects,
+  removeFavorite,
   SOURCE_LABELS,
   type DailyPick,
+  type DailyPickItem,
   type Project,
 } from '../api'
 import AppHeader from '../components/AppHeader.vue'
@@ -365,6 +368,8 @@ function formatK(n: number): string {
 // ---- 每日精选 ----
 const dailyPick = ref<DailyPick | null>(null)
 const shuffleLoading = ref(false)
+/** 「换一批」后的标记：日期不再代表这批项目的来源日 */
+const pickShuffled = ref(false)
 
 async function loadDailyPick() {
   try {
@@ -378,16 +383,78 @@ async function shufflePick() {
   shuffleLoading.value = true
   try {
     dailyPick.value = await fetchShufflePick()
+    pickShuffled.value = true
   } catch { /* 保持原内容 */ } finally {
     shuffleLoading.value = false
   }
 }
 
+/** 精选条日期展示：今日 / N 天前 / 随机一批。
+ *
+ * 原来直接印 `2026-11-05` —— 用户得自己心算「这是几天前？」
+ * 而且是 UTC 日期，跨时区可能差一天。改用相对时间更好读。
+ */
+const pickDateLabel = computed(() => {
+  if (pickShuffled.value) return t('pick_shuffled')
+  const d = dailyPick.value?.pick_date
+  if (!d) return ''
+  const today = new Date()
+  const target = new Date(d + 'T00:00:00')
+  const days = Math.round((today.setHours(0, 0, 0, 0) - target.getTime()) / 86400000)
+  if (days <= 0) return t('pick_today')
+  return t('pick_days_ago').replace('{n}', String(days))
+})
+
+/** 分类色（与 ProjectCard 同一张表；精选条的分类标签也用彩色，一眼可分） */
+const CATEGORY_COLORS: Record<string, string> = {
+  影视: '#f472b6', 视频工具: '#e879f9', 游戏: '#a78bfa', 游戏开发: '#818cf8',
+  开发: '#38bdf8', AI工具: '#34d399', 效率工具: '#fbbf24', 加速工具: '#fb923c',
+  设计: '#fb7185', 创作: '#f43f5e', 音乐: '#2dd4bf', 阅读: '#22d3ee',
+}
+function catColor(c: string): string {
+  return CATEGORY_COLORS[c] ?? 'var(--text-dim)'
+}
+
+// 精选条收藏：与列表卡片同一套接口，状态就地更新
+const favBusyId = ref<number | null>(null)
+async function togglePickFavorite(p: DailyPickItem, ev: Event) {
+  ev.preventDefault()          // 卡片是 router-link，别跳详情页
+  ev.stopPropagation()
+  if (favBusyId.value !== null) return
+  favBusyId.value = p.id
+  try {
+    if (p.is_favorite) {
+      await removeFavorite(p.id)
+      p.is_favorite = false
+    } else {
+      await addFavorite(p.id)
+      p.is_favorite = true
+    }
+    // 广播收藏变更：同一项目可能同时出现在精选条和下方列表卡片里，
+    // 不通知的话另一处仍显示旧状态（实测踩到）。
+    window.dispatchEvent(new CustomEvent('starpick:favorite-changed', {
+      detail: { id: p.id, favorite: p.is_favorite },
+    }))
+  } catch { /* 忽略：状态不变即反馈失败 */ } finally {
+    favBusyId.value = null
+  }
+}
+
+/** 收藏变更事件：同步精选条与列表卡片的收藏态（同项目的两个入口） */
+function onFavoriteChanged(e: Event) {
+  const { id, favorite } = (e as CustomEvent<{ id: number; favorite: boolean }>).detail
+  const hit = dailyPick.value?.items.find((it) => it.id === id)
+  if (hit) hit.is_favorite = favorite
+}
+
 onMounted(() => {
   loadDailyPick()
+  // 收藏在别处变更（list 卡片 / 精选条 / 收藏弹窗）时同步精选条状态
+  window.addEventListener('starpick:favorite-changed', onFavoriteChanged)
 })
 onUnmounted(() => {
   if (debounceTimer) clearTimeout(debounceTimer)
+  window.removeEventListener('starpick:favorite-changed', onFavoriteChanged)
 })
 </script>
 
@@ -400,7 +467,7 @@ onUnmounted(() => {
       <div class="picks-head">
         <div class="picks-title">
           <span>{{ t('daily_pick') }}</span>
-          <span v-if="dailyPick.pick_date" class="picks-date">{{ dailyPick.pick_date }}</span>
+          <span v-if="pickDateLabel" class="picks-date">{{ pickDateLabel }}</span>
         </div>
         <button class="picks-shuffle" :disabled="shuffleLoading" @click="shufflePick">
           <span class="picks-shuffle-icon" :class="{ spinning: shuffleLoading }">↻</span>
@@ -414,10 +481,33 @@ onUnmounted(() => {
           :to="`/project/${p.id}`"
           class="pick-card"
         >
-          <span class="pick-rank">#{{ p.rank }}</span>
-          <span class="pick-name">{{ p.name }}</span>
-          <span class="tag">{{ t('cat_' + p.category) }}</span>
-          <span class="stars">★ {{ formatK(p.stars) }}</span>
+          <div class="pick-top">
+            <span class="pick-rank">#{{ p.rank }}</span>
+            <span v-if="p.has_update" class="pick-new" :title="t('pick_new_ver')">↑</span>
+            <span class="pick-stars">★ {{ formatK(p.stars) }}</span>
+          </div>
+          <div class="pick-name" :title="p.full_name">{{ p.name }}</div>
+          <div class="pick-meta">
+            <span class="pick-cat" :style="{ color: catColor(p.category), borderColor: catColor(p.category) }">
+              {{ t('cat_' + p.category) }}
+            </span>
+            <span class="pick-owner" :title="p.full_name">@{{ p.owner }}</span>
+            <!-- 收藏用书签图标（与列表卡片同一套 .fav-btn）：第一行已有 ★ 星数，
+                 两个星星并排会像重复。`bare` 是去边框的紧凑变体。 -->
+            <button
+              class="fav-btn pick-fav bare"
+              :class="{ on: p.is_favorite }"
+              :disabled="favBusyId === p.id"
+              :title="p.is_favorite ? t('card_fav_remove_tip') : t('card_fav_tip')"
+              :aria-label="p.is_favorite ? t('card_fav_remove_tip') : t('card_fav_tip')"
+              @click="togglePickFavorite(p, $event)"
+            >
+              <svg class="fav-btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+              </svg>
+            </button>
+          </div>
         </router-link>
       </div>
     </div>

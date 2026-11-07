@@ -527,6 +527,10 @@ export interface DailyPickItem {
   zh_friendly: number
   rank: number
   score: number
+  /** 是否已收藏（精选条收藏星标用） */
+  is_favorite?: boolean
+  /** 是否有新版本（精选条「有新版本」徽标用） */
+  has_update?: boolean
 }
 
 export interface DailyPick {

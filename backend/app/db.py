@@ -1385,15 +1385,25 @@ class Database:
             return int(self._conn.execute(sql, params).fetchone()["c"])
 
     def pick_shuffle(self, count: int = 15) -> list[dict]:
-        """「换一批」候选：随机抽取（多取一些供分类去重），含列表展示字段。"""
+        """「换一批」候选：随机抽取（多取一些供分类去重），含列表展示字段。
+
+        同样带 is_favorite / has_update —— 精选条上的收藏与「有新版本」徽标需要。
+        """
         with self._lock:
             rows = self._conn.execute(
                 "SELECT id, full_name, name, owner, description, category, stars, "
-                "language, zh_friendly, has_update "
+                "language, zh_friendly, has_update, "
+                "(SELECT 1 FROM favorites f WHERE f.project_id = projects.id) AS is_favorite "
                 "FROM projects WHERE stars >= 20 ORDER BY RANDOM() LIMIT ?",
                 (count,),
             ).fetchall()
-            return [dict(r) for r in rows]
+            out = []
+            for r in rows:
+                d = dict(r)
+                d["is_favorite"] = bool(d.get("is_favorite"))
+                d["has_update"] = bool(d.get("has_update"))
+                out.append(d)
+            return out
 
     def save_daily_pick(self, pick_date: str,
                         picks: list[tuple[int, int, float]]) -> None:
@@ -1421,7 +1431,11 @@ class Database:
             self._conn.commit()
 
     def get_latest_daily_pick(self) -> dict | None:
-        """最新一日精选（联查项目信息）；无数据返回 None。"""
+        """最新一日精选（联查项目信息）；无数据返回 None。
+
+        `is_favorite` / `has_update` 一并带出：精选条上的收藏星标与「有新版本」
+        徽标要靠它们（只 SELECT 展示字段会让精选条上的收藏按钮永远显示未收藏）。
+        """
         with self._lock:
             row = self._conn.execute(
                 "SELECT pick_date FROM daily_picks ORDER BY pick_date DESC LIMIT 1",
@@ -1430,12 +1444,20 @@ class Database:
                 return None
             rows = self._conn.execute(
                 "SELECT p.id, p.full_name, p.name, p.owner, p.description, p.stars, "
-                "p.language, p.category, p.zh_friendly, d.rank, d.score, d.pick_date "
+                "p.language, p.category, p.zh_friendly, p.has_update, "
+                "(SELECT 1 FROM favorites f WHERE f.project_id = p.id) AS is_favorite, "
+                "d.rank, d.score, d.pick_date "
                 "FROM daily_picks d JOIN projects p ON p.id = d.project_id "
                 "WHERE d.pick_date=? ORDER BY d.rank ASC",
                 (row["pick_date"],),
             ).fetchall()
-            return {"pick_date": row["pick_date"], "items": [dict(r) for r in rows]}
+            items = []
+            for r in rows:
+                d = dict(r)
+                d["is_favorite"] = bool(d.get("is_favorite"))
+                d["has_update"] = bool(d.get("has_update"))
+                items.append(d)
+            return {"pick_date": row["pick_date"], "items": items}
 
     def close(self) -> None:
         with self._lock:

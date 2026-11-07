@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { Project } from '../api'
 import { addFavorite, bareFullName, removeFavorite, formatDate, formatStars, projectSource, SOURCE_LABELS } from '../api'
@@ -21,6 +21,17 @@ const sourceLabel = computed(() => SOURCE_LABELS[source.value] ?? source.value)
 const fav = ref(props.project.is_favorite)
 const favBusy = ref(false)
 
+/** 收藏在别处变更（每日精选条 / 收藏弹窗）时同步本卡片。
+ *  同一项目会同时出现在精选条和列表首屏，两处必须联动，
+ *  否则一处点了收藏、另一处仍显示未收藏（实测踩到）。
+ */
+function onFavoriteChanged(e: Event) {
+  const { id, favorite } = (e as CustomEvent<{ id: number; favorite: boolean }>).detail
+  if (id === props.project.id) fav.value = favorite
+}
+onMounted(() => window.addEventListener('starpick:favorite-changed', onFavoriteChanged))
+onUnmounted(() => window.removeEventListener('starpick:favorite-changed', onFavoriteChanged))
+
 async function toggleFavorite() {
   if (favBusy.value) return
   favBusy.value = true
@@ -32,6 +43,11 @@ async function toggleFavorite() {
       await addFavorite(props.project.id)
       fav.value = true
     }
+    // 广播收藏变更：本卡片与每日精选条是同一项目的两个入口，
+    // 不通知的话另一处仍显示旧状态。
+    window.dispatchEvent(new CustomEvent('starpick:favorite-changed', {
+      detail: { id: props.project.id, favorite: fav.value },
+    }))
   } catch { /* 忽略：状态不变即反馈失败 */ } finally {
     favBusy.value = false
   }
@@ -105,15 +121,19 @@ function openInstallPrompt() {
       </div>
       <div class="card-head-right">
         <span class="stars">★ {{ formatStars(project.stars) }}</span>
-        <!-- 卡片快速收藏：点击直接收藏/取消（阻止冒泡，不触发进详情） -->
+        <!-- 卡片快速收藏：点击直接收藏/取消（阻止冒泡，不触发进详情）。
+             图标是书签而非星星——它紧挨着 `★ 398k` 星数，两个星星会让人
+             分不清哪个可点。与每日精选条共用同一套 .fav-btn 样式。 -->
         <button
-          class="fav-star"
+          class="fav-btn"
           :class="{ on: fav }"
+          :disabled="favBusy"
           :title="fav ? t('card_fav_remove_tip') : t('card_fav_tip')"
+          :aria-label="fav ? t('card_fav_remove_tip') : t('card_fav_tip')"
           @click.stop="toggleFavorite"
         >
-          <svg class="fav-star-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7-5.4-4.7 7.1-.6z" />
+          <svg class="fav-btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
           </svg>
         </button>
       </div>
